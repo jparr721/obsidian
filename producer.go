@@ -40,6 +40,6 @@ func producer() {
 			log.Fatal(err)
 		}
 		time.Sleep(1 * time.Second)
-    i++
+		i++
 	}
 }

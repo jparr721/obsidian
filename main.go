@@ -31,7 +31,7 @@ func configureTopics() {
 	defer cancel()
 
 	topic := os.Getenv("KAFKA_TOPIC")
-  kafkaURL := os.Getenv("KAFKA_URL")
+	kafkaURL := os.Getenv("KAFKA_URL")
 
 	conn, err := (&kafka.Dialer{
 		Resolver: &net.Resolver{},
@@ -59,12 +59,12 @@ func main() {
 	var routineWaitGroup sync.WaitGroup
 	routineWaitGroup.Add(1)
 
-  initializeInterruptHandler()
+	initializeInterruptHandler()
 
-  err := godotenv.Load()
-  if err != nil {
-    log.Fatal("Error loading .env file")
-  }
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
 	configureTopics()
 	initiateProducersAndConsumers()
