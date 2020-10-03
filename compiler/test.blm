@@ -1,0 +1,16 @@
+taken = "x" end
+open = "o" end
+
+Lattice = TwoDArray(100, 100) end
+
+# Brownian motion walk in a lattice
+Walk x, y do
+  v = rand(0, 1)
+  if v == 0
+    return x + 1
+  else
+    return y + 1
+  end
+end
+
+Collision x, y do return Walk(x, y) == taken end

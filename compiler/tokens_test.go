@@ -143,15 +143,57 @@ func TestRegularExpressionMatching(test *testing.T) {
 			Input:    "^",
 			Expected: true,
 		},
+		{
+			Name:     "DO",
+			Kind:     DO,
+			Input:    "do",
+			Expected: true,
+		},
+		{
+			Name:     "END",
+			Kind:     END,
+			Input:    "end",
+			Expected: true,
+		},
+		{
+			Name:     "IF",
+			Kind:     IF,
+			Input:    "if",
+			Expected: true,
+		},
+		{
+			Name:     "ELSE",
+			Kind:     ELSE,
+			Input:    "else",
+			Expected: true,
+		},
+		{
+			Name:     "QUOTE",
+			Kind:     QUOTE,
+			Input:    "\"",
+			Expected: true,
+		},
+		{
+			Name:     "FUNCTION_GOOD",
+			Kind:     FUNCTION,
+			Input:    "Walk",
+			Expected: true,
+		},
+		{
+			Name:     "FUNCTION_BAD",
+			Kind:     FUNCTION,
+			Input:    "walk",
+			Expected: false,
+		},
 	}
 
 	for _, regexTest := range allTests {
 		test.Logf("TestRegularExpressionMatching -- %s", regexTest.Name)
 		re := regexTest.Kind.Regex()
 		if re.MatchString(regexTest.Input) != regexTest.Expected {
-      test.Logf("failing test: %s", regexTest.Name)
-      test.Logf("Input: %s", regexTest.Input)
-      test.Logf("Expected: %t", regexTest.Expected)
+			test.Logf("failing test: %s", regexTest.Name)
+			test.Logf("Input: %s", regexTest.Input)
+			test.Logf("Expected: %t", regexTest.Expected)
 			test.Fail()
 		}
 	}

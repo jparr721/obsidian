@@ -1,6 +1,8 @@
 package compiler
 
-import "regexp"
+import (
+	"regexp"
+)
 
 // TokenKind represents the type of token in a given operation sequence
 type TokenKind int
@@ -21,6 +23,21 @@ const (
 	// CSQUARE represents a right square bracket
 	CSQUARE
 
+	// QUOTE represents "
+	QUOTE
+
+	// DO represents the start of a logical statement
+	DO
+
+	// END represents the end of a logical statement
+	END
+
+	// IF represents a if statement
+	IF
+
+	// ELSE represents an else statement
+	ELSE
+
 	// ALL represents a for-all loop
 	ALL
 
@@ -29,6 +46,9 @@ const (
 
 	// VARIABLE represents a variable
 	VARIABLE
+
+	// FUNCTION represents a function identifier(name)
+	FUNCTION
 
 	// OPAREN represents a left parenthesis
 	OPAREN
@@ -76,20 +96,6 @@ const (
 	POW
 )
 
-// BinaryOps are binary operations that runtime methods can perform
-var BinaryOps = []TokenKind{
-	EQUALS,
-	AND,
-	OR,
-	PLUS,
-	MINUS,
-	MULTIPLY,
-	DIVIDE,
-	MODULO,
-	GREATERTHAN,
-	LESSTHAN,
-}
-
 func (kind TokenKind) String() string {
 	switch kind {
 
@@ -97,12 +103,24 @@ func (kind TokenKind) String() string {
 		return "OSQUARE"
 	case CSQUARE:
 		return "CSQUARE"
+	case QUOTE:
+		return "QUOTE"
+	case DO:
+		return "DO"
+	case END:
+		return "END"
+	case IF:
+		return "IF"
+	case ELSE:
+		return "ELSE"
 	case ALL:
 		return "ALL"
 	case SEMI:
 		return "SEMI"
 	case VARIABLE:
 		return "VARIABLE"
+	case FUNCTION:
+		return "FUNCTION"
 	case OPAREN:
 		return "OPAREN"
 	case CPAREN:
@@ -138,6 +156,35 @@ func (kind TokenKind) String() string {
 	return "UNKNOWN"
 }
 
+var KindsList = []TokenKind{
+	OSQUARE,
+	CSQUARE,
+	QUOTE,
+	DO,
+	END,
+	IF,
+	ELSE,
+	ALL,
+	SEMI,
+	OPAREN,
+	CPAREN,
+	COMMA,
+	WHERE,
+	PLUS,
+	MINUS,
+	MULTIPLY,
+	DIVIDE,
+	MODULO,
+	GREATERTHAN,
+	LESSTHAN,
+	AND,
+	OR,
+	EQUALS,
+	POW,
+	VARIABLE,
+	FUNCTION,
+}
+
 func (kind TokenKind) Regex() *regexp.Regexp {
 	switch kind {
 
@@ -145,12 +192,24 @@ func (kind TokenKind) Regex() *regexp.Regexp {
 		return regexp.MustCompile("(?P<OSQUARE>\\A(\\[))")
 	case CSQUARE:
 		return regexp.MustCompile("(?P<CSQUARE>\\A(\\]))")
+	case QUOTE:
+		return regexp.MustCompile("(?P<QUOTE>\\A(\"))")
+	case DO:
+		return regexp.MustCompile("(?P<DO>\\A(do))")
+	case END:
+		return regexp.MustCompile("(?P<END>\\A(end))")
+	case IF:
+		return regexp.MustCompile("(?P<IF>\\A(if))")
+	case ELSE:
+		return regexp.MustCompile("(?P<ELSE>\\A(else))")
 	case ALL:
 		return regexp.MustCompile("(?P<ALL>\\A(ALL))")
 	case SEMI:
 		return regexp.MustCompile("(?P<SEMI>\\A(;))")
 	case VARIABLE:
-		return regexp.MustCompile("(?P<VARIABLE>\\A(^[a-zA-Z]\\w*$))")
+		return regexp.MustCompile("(?P<VARIABLE>\\A(^[a-z]\\w*$))")
+	case FUNCTION:
+		return regexp.MustCompile("(?P<FUNCTION>\\A(^[A-Z]\\w*$))")
 	case OPAREN:
 		return regexp.MustCompile("(?P<OPAREN>\\A(\\())")
 	case CPAREN:
@@ -184,4 +243,71 @@ func (kind TokenKind) Regex() *regexp.Regexp {
 	}
 
 	return regexp.MustCompile("(?<UNKNOWN>\\A(UNKNOWN))")
+}
+
+func ConvertTokenToKind(token string) TokenKind {
+	switch token {
+	case "[":
+		return OSQUARE
+	case "]":
+		return CSQUARE
+	case "\"":
+		return QUOTE
+	case "do":
+		return DO
+	case "end":
+		return END
+	case "if":
+		return IF
+	case "else":
+		return ELSE
+	case "ALL":
+		return ALL
+	case ";":
+		return SEMI
+	case "(":
+		return OPAREN
+	case ")":
+		return CPAREN
+	case ",":
+		return COMMA
+	case "WHERE":
+		return WHERE
+	case "+":
+		return PLUS
+	case "-":
+		return MINUS
+	case "*":
+		return MULTIPLY
+	case "/":
+		return DIVIDE
+	case "%":
+		return MODULO
+	case ">":
+		return GREATERTHAN
+	case "<":
+		return LESSTHAN
+	case "AND":
+		return AND
+	case "OR":
+		return OR
+	case "=":
+		return EQUALS
+	case "^":
+		return POW
+	default:
+		re := VARIABLE.Regex()
+
+		if re.MatchString(token) {
+			return VARIABLE
+		}
+
+		re = FUNCTION.Regex()
+
+		if re.MatchString(token) {
+			return FUNCTION
+		}
+
+		return UNKNOWN
+	}
 }
