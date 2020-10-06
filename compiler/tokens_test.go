@@ -185,6 +185,30 @@ func TestRegularExpressionMatching(test *testing.T) {
 			Input:    "walk",
 			Expected: false,
 		},
+		{
+			Name:     "STRINGVALUE",
+			Kind:     STRINGVALUE,
+			Input:    "\"foobar\"",
+			Expected: true,
+		},
+		{
+			Name:     "STRINGVALUE_FAIL",
+			Kind:     STRINGVALUE,
+			Input:    "foobar",
+			Expected: false,
+		},
+		{
+			Name:     "NUMERICVALUE",
+			Kind:     NUMERICVALUE,
+			Input:    "12345",
+			Expected: true,
+		},
+		{
+			Name:     "NUMERICVALUE_FAIL",
+			Kind:     NUMERICVALUE,
+			Input:    "\"foobar\"",
+			Expected: false,
+		},
 	}
 
 	for _, regexTest := range allTests {

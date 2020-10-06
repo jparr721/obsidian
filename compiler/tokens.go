@@ -44,10 +44,16 @@ const (
 	// SEMI represents a semicolon
 	SEMI
 
-	// VARIABLE represents a variable
+	// VARIABLE represents a variable identifier
 	VARIABLE
 
-	// FUNCTION represents a function identifier(name)
+	// STRINGVALUE represents some numeric or string value
+	STRINGVALUE
+
+	// NUMERICVALUE represents some numeric or string value
+	NUMERICVALUE
+
+	// FUNCTION represents a function identifier (name)
 	FUNCTION
 
 	// OPAREN represents a left parenthesis
@@ -119,6 +125,10 @@ func (kind TokenKind) String() string {
 		return "SEMI"
 	case VARIABLE:
 		return "VARIABLE"
+	case STRINGVALUE:
+		return "STRINVALUE"
+	case NUMERICVALUE:
+		return "NUMERICVALUE"
 	case FUNCTION:
 		return "FUNCTION"
 	case OPAREN:
@@ -182,6 +192,8 @@ var KindsList = []TokenKind{
 	EQUALS,
 	POW,
 	VARIABLE,
+	STRINGVALUE,
+	NUMERICVALUE,
 	FUNCTION,
 }
 
@@ -208,6 +220,10 @@ func (kind TokenKind) Regex() *regexp.Regexp {
 		return regexp.MustCompile("(?P<SEMI>\\A(;))")
 	case VARIABLE:
 		return regexp.MustCompile("(?P<VARIABLE>\\A(^[a-z]\\w*$))")
+	case STRINGVALUE:
+		return regexp.MustCompile("(?P<STRINGVALUE>\\A(^\"[a-z]\\w*\"$))")
+	case NUMERICVALUE:
+		return regexp.MustCompile("(?P<NUMERICVALUE>\\A(^[0-9]+))")
 	case FUNCTION:
 		return regexp.MustCompile("(?P<FUNCTION>\\A(^[A-Z]\\w*$))")
 	case OPAREN:

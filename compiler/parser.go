@@ -3,13 +3,15 @@ package compiler
 import (
 	"container/list"
 	"fmt"
+	"reflect"
+	"strconv"
 )
 
 type AstStack struct {
 	stack *list.List
 }
 
-func (s *AstStack) Push(node AstNode) {
+func (s *AstStack) Push(node *AstNode) {
 	s.stack.PushFront(node)
 }
 
@@ -22,12 +24,12 @@ func (s *AstStack) Pop() error {
 	return fmt.Errorf("Stack is empty, bruh")
 }
 
-func (s *AstStack) Peek() (AstNode, error) {
-  if s.Size() > 0 {
-    return s.stack.Front().Value.(AstNode), nil
-  }
+func (s *AstStack) Peek() (*AstNode, error) {
+	if s.Size() > 0 {
+		return s.stack.Front().Value.(*AstNode), nil
+	}
 
-	return AstNode{}, fmt.Errorf("Stack is empty, bruh")
+	return &AstNode{}, fmt.Errorf("Stack is empty, bruh")
 }
 
 func (s *AstStack) Size() int {
@@ -60,7 +62,7 @@ type AstNode struct {
 
 type Ast struct {
 	Node  AstNode
-	Scope AstStack
+	Scope *AstStack
 }
 
 func NewAst() *Ast {
@@ -72,8 +74,29 @@ func NewAst() *Ast {
 	}
 }
 
-func (a *Ast) Insert(node AstNode) (bool, error) {
-  currentLexicalScope := a.Scope.Peek()
+func (a *Ast) Insert(node interface{}) (bool, error) {
+	currentLexicalScope, err := a.Scope.Peek()
+
+	if err != nil {
+		return false, err
+	}
+
+	astNode := AstNode{
+		Name:     a.inferNodeType(node),
+		Value:    node,
+		Children: make([]AstNode, 0),
+	}
+
+	if astNode.Name == "FunctionAstNode" && currentLexicalScope.Name == "FunctionAstNode" {
+		panic("cannot nest two function expressions, idiot")
+	}
+
+	currentLexicalScope.Children = append(currentLexicalScope.Children, astNode)
+	return true, nil
+}
+
+func (a *Ast) inferNodeType(node interface{}) string {
+	return reflect.TypeOf(node).Name()
 }
 
 type FunctionAstNode struct {
@@ -81,16 +104,22 @@ type FunctionAstNode struct {
 	Parameters []InputParameter
 }
 
+type VariableAstNode struct {
+	Name  string
+	Type  string
+	Value interface{}
+}
+
 type Parser struct {
 	tokens     []Token
-  SyntaxTree *Ast
+	SyntaxTree *Ast
 }
 
 func NewParser(tokens []Token) *Parser {
-  return &Parser{
-    tokens: tokens,
-    SyntaxTree: NewAst(),
-  }
+	return &Parser{
+		tokens:     tokens,
+		SyntaxTree: NewAst(),
+	}
 }
 
 func (p *Parser) ConsumeFunction() {
@@ -100,7 +129,54 @@ func (p *Parser) ConsumeFunction() {
 		parameters = append(parameters, InputParameter{Name: p.consumeToken(VARIABLE.String()).Value.(string)})
 	}
 
-	functionAstNode := FunctionAstNode{Name: functionName, Parameters: parameters}
+	if !p.peekToken(DO.String()) {
+		p.consumeToken(DO.String())
+	}
+
+	functionAstNode := FunctionAstNode{Name: functionName.Value.(string), Parameters: parameters}
+	p.SyntaxTree.Insert(functionAstNode)
+}
+
+func (p *Parser) ConsumeVariable() {
+	variableName := p.consumeToken(VARIABLE.String()).Value.(string)
+	variableType := ""
+	p.consumeToken(EQUALS.String())
+
+	var stringVariableValue string
+	var numericVariableValue float64
+	if p.peekToken(STRINGVALUE.String()) {
+		stringVariableValue = p.consumeToken(STRINGVALUE.String()).Value.(string)
+		variableType = STRINGVALUE.String()
+	} else if p.peekToken(NUMERICVALUE.String()) {
+		stringVariableValue = p.consumeToken(NUMERICVALUE.String()).Value.(string)
+
+		var err error
+		numericVariableValue, err = strconv.ParseFloat(stringVariableValue, 64)
+
+		if err != nil {
+			//TODO(jparr721) - Make this error not fucking terrible to reason about.
+			panic(err)
+		}
+
+		variableType = NUMERICVALUE.String()
+	}
+
+	switch variableType {
+	case NUMERICVALUE.String():
+		variableAstNode := VariableAstNode{
+			Name:  variableName,
+			Type:  variableType,
+			Value: numericVariableValue,
+		}
+		p.SyntaxTree.Insert(variableAstNode)
+	case STRINGVALUE.String():
+		variableAstNode := VariableAstNode{
+			Name:  variableName,
+			Type:  variableType,
+			Value: stringVariableValue,
+		}
+		p.SyntaxTree.Insert(variableAstNode)
+	}
 }
 
 func (p *Parser) peekToken(expected string) bool {
