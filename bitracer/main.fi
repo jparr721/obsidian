@@ -1,0 +1,5 @@
+class Foobaru {
+  fun bar() {
+    return 10;
+  }
+}
