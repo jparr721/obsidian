@@ -1,10 +1,10 @@
 package main
 
 type visitor interface {
-	visitbinaryExpr(*binaryExpr) interface{}
-	visitgroupingExpr(*groupingExpr) interface{}
-	visitliteralExpr(*literalExpr) interface{}
-	visitunaryExpr(*unaryExpr) interface{}
+	visitBinaryExpr(*binaryExpr) interface{}
+	visitGroupingExpr(*groupingExpr) interface{}
+	visitLiteralExpr(*literalExpr) interface{}
+	visitUnaryExpr(*unaryExpr) interface{}
 }
 
 // Expr repsents an interface underneath each expression statement
@@ -14,13 +14,13 @@ type expr interface {
 
 // binaryExpr is a recursive data structure representing a syntax tree
 type binaryExpr struct {
-	Left     expr
+	left     expr
 	operator token
-	Right    expr
+	right    expr
 }
 
 func (b *binaryExpr) accept(v visitor) interface{} {
-	return v.visitbinaryExpr(b)
+	return v.visitBinaryExpr(b)
 }
 
 // newbinaryExpr creates a new binary expression given the parameters
@@ -38,7 +38,7 @@ type groupingExpr struct {
 }
 
 func (g *groupingExpr) accept(v visitor) interface{} {
-	return v.visitgroupingExpr(g)
+	return v.visitGroupingExpr(g)
 }
 
 // newgroupingExpr creates a new grouping expression given the parameters
@@ -54,7 +54,7 @@ type literalExpr struct {
 }
 
 func (l *literalExpr) accept(v visitor) interface{} {
-	return v.visitliteralExpr(l)
+	return v.visitLiteralExpr(l)
 }
 
 // newliteralExpr creates a new literal value given the parameters
@@ -71,7 +71,7 @@ type unaryExpr struct {
 }
 
 func (u *unaryExpr) accept(v visitor) interface{} {
-	return v.visitunaryExpr(u)
+	return v.visitUnaryExpr(u)
 }
 
 // newunaryExpr creates a new unary value given the parameters

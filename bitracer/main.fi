@@ -1,5 +1,2 @@
-class Foobaru {
-  fun bar() {
-    return 10;
-  }
-}
+10 * 10;
+10 * "fucky";

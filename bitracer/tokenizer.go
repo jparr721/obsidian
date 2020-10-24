@@ -44,65 +44,83 @@ func (t *tokenizer) scanToken() {
 	c := t.next()
 	switch c {
 	case "(":
-		t.addtoken(OPAREN, nil)
+		t.addToken(OPAREN, nil)
+		break
 	case ")":
-		t.addtoken(CPAREN, nil)
+		t.addToken(CPAREN, nil)
+		break
 	case "{":
-		t.addtoken(OSQUIGGLE, nil)
+		t.addToken(OSQUIGGLE, nil)
+		break
 	case "}":
-		t.addtoken(CSQUIGGLE, nil)
+		t.addToken(CSQUIGGLE, nil)
+		break
 	case ",":
-		t.addtoken(COMMA, nil)
+		t.addToken(COMMA, nil)
+		break
 	case ".":
-		t.addtoken(DOT, nil)
+		t.addToken(DOT, nil)
+		break
 	case "-":
-		t.addtoken(MINUS, nil)
+		t.addToken(MINUS, nil)
+		break
 	case "+":
-		t.addtoken(PLUS, nil)
+		t.addToken(PLUS, nil)
+		break
 	case ";":
-		t.addtoken(SEMI, nil)
+		t.addToken(SEMI, nil)
+		break
 	case "*":
-		t.addtoken(STAR, nil)
+		t.addToken(STAR, nil)
+		break
 	case "!":
 		if t.match("=") {
-			t.addtoken(BANGEQUAL, nil)
+			t.addToken(BANGEQUAL, nil)
 		} else {
-			t.addtoken(BANG, nil)
+			t.addToken(BANG, nil)
 		}
+		break
 	case "=":
 		if t.match("=") {
-			t.addtoken(EQUALEQUAL, nil)
+			t.addToken(EQUALEQUAL, nil)
 		} else {
-			t.addtoken(EQUAL, nil)
+			t.addToken(EQUAL, nil)
 		}
+		break
 	case "<":
 		if t.match("=") {
-			t.addtoken(LESSEQUAL, nil)
+			t.addToken(LESSEQUAL, nil)
 		} else {
-			t.addtoken(LESS, nil)
+			t.addToken(LESS, nil)
 		}
+		break
 	case ">":
 		if t.match("=") {
-			t.addtoken(GREATEREQUAL, nil)
+			t.addToken(GREATEREQUAL, nil)
 		} else {
-			t.addtoken(GREATER, nil)
+			t.addToken(GREATER, nil)
 		}
+		break
 	case "/":
 		if t.match("/") {
 			for t.peek() != "\\n" && !t.end() {
 				t.next()
 			}
 		} else {
-			t.addtoken(SLASH, nil)
+			t.addToken(SLASH, nil)
 		}
-	case " ":
-	case "\\r":
-	case "\\t":
 		break
-	case "\\n":
+	case " ":
+	case "":
+	case "\r":
+	case "\t":
+		break
+	case "\n":
 		t.line++
+		break
 	case "\"":
 		t.parseString()
+		break
 	default:
 		if t.isDigit(c) {
 			t.parseNumber()
@@ -111,6 +129,7 @@ func (t *tokenizer) scanToken() {
 		} else {
 			lineError(t.line, fmt.Sprintf("Unexpected character: %s", c))
 		}
+		break
 	}
 }
 
@@ -141,11 +160,11 @@ func (t *tokenizer) parseIdentifier() {
 	tokenType, ok := keywords[text]
 
 	if !ok {
-		t.addtoken(IDENTIFIER, nil)
+		t.addToken(IDENTIFIER, nil)
 		return
 	}
 
-	t.addtoken(tokenType, nil)
+	t.addToken(tokenType, nil)
 }
 
 func (t *tokenizer) parseNumber() {
@@ -169,7 +188,7 @@ func (t *tokenizer) parseNumber() {
 		lineError(t.line, err.Error())
 	}
 
-	t.addtoken(NUMBER, value)
+	t.addToken(NUMBER, value)
 }
 
 func (t *tokenizer) parseString() {
@@ -189,7 +208,7 @@ func (t *tokenizer) parseString() {
 
 	// Trim quotes
 	value := t.src[t.start+1 : t.current-1]
-	t.addtoken(STRING, value)
+	t.addToken(STRING, value)
 }
 
 func (t *tokenizer) peek() string {
@@ -221,7 +240,7 @@ func (t *tokenizer) match(expected string) bool {
 	return true
 }
 
-func (t *tokenizer) addtoken(tokenType tokenType, literal interface{}) {
+func (t *tokenizer) addToken(tokenType tokenType, literal interface{}) {
 	text := t.src[t.start:t.current]
 	t.tokens = append(t.tokens, newToken(tokenType, text, literal, t.line))
 }

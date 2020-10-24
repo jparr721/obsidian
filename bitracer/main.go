@@ -8,7 +8,8 @@ import (
 	"os"
 )
 
-var hadError bool = false
+var hadParseError bool = false
+var hadRuntimeError bool = false
 
 func main() {
 	arglen := len(os.Args)
@@ -51,37 +52,23 @@ func runPrompt() {
 
 func runFile(filename string) {
 	content := readFileContent(filename)
-  run(content)
+	run(content)
 }
 
 func run(fileContents string) {
-  tokens := newTokenizer(fileContents).scanTokens()
-  fmt.Println(tokens)
-  parser := newParser(tokens)
-  expr := parser.parse()
+	tokens := newTokenizer(fileContents).scanTokens()
+	parser := newParser(tokens)
+	expr := parser.parse()
+	fmt.Printf("%v\n", expr)
 
-  if hadError {
-    return
-  }
+	if hadParseError {
+		return
+	}
 
-  pp := newAstPrinter()
+	if hadRuntimeError {
+		return
+	}
 
-  fmt.Println(pp.printAst(expr))
-}
-
-func lineError(line int, message string) {
-	reportError(line, "", message)
-}
-
-func parseError(t token, m string) {
-  if t.variant == EOF {
-    reportError(t.line, " at end", m)
-  } else {
-    reportError(t.line, " at " + t.lexeme + "'", m)
-  }
-}
-
-func reportError(line int, where, message string) {
-	fmt.Printf("[line %d] Error %s: %s\n", line, where, message)
-  hadError = true
+	interpreter := &interpreter{}
+	interpreter.interpret(expr)
 }
