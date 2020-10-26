@@ -44,9 +44,7 @@ func runPrompt() {
 			fmt.Println("goodbye")
 			os.Exit(0)
 		}
-		tokenizer := newTokenizer(text)
-
-		fmt.Println(tokenizer.scanTokens())
+		run(text)
 	}
 }
 
@@ -58,8 +56,7 @@ func runFile(filename string) {
 func run(fileContents string) {
 	tokens := newTokenizer(fileContents).scanTokens()
 	parser := newParser(tokens)
-	expr := parser.parse()
-	fmt.Printf("%v\n", expr)
+	stmts := parser.parse()
 
 	if hadParseError {
 		return
@@ -70,5 +67,5 @@ func run(fileContents string) {
 	}
 
 	interpreter := &interpreter{}
-	interpreter.interpret(expr)
+	interpreter.interpret(stmts)
 }

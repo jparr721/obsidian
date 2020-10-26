@@ -1,6 +1,6 @@
 package main
 
-type visitor interface {
+type expressionVisitor interface {
 	visitBinaryExpr(*binaryExpr) interface{}
 	visitGroupingExpr(*groupingExpr) interface{}
 	visitLiteralExpr(*literalExpr) interface{}
@@ -9,7 +9,7 @@ type visitor interface {
 
 // Expr repsents an interface underneath each expression statement
 type expr interface {
-	accept(visitor) interface{}
+	accept(expressionVisitor) interface{}
 }
 
 // binaryExpr is a recursive data structure representing a syntax tree
@@ -19,7 +19,7 @@ type binaryExpr struct {
 	right    expr
 }
 
-func (b *binaryExpr) accept(v visitor) interface{} {
+func (b *binaryExpr) accept(v expressionVisitor) interface{} {
 	return v.visitBinaryExpr(b)
 }
 
@@ -37,7 +37,7 @@ type groupingExpr struct {
 	expression interface{}
 }
 
-func (g *groupingExpr) accept(v visitor) interface{} {
+func (g *groupingExpr) accept(v expressionVisitor) interface{} {
 	return v.visitGroupingExpr(g)
 }
 
@@ -53,7 +53,7 @@ type literalExpr struct {
 	value interface{}
 }
 
-func (l *literalExpr) accept(v visitor) interface{} {
+func (l *literalExpr) accept(v expressionVisitor) interface{} {
 	return v.visitLiteralExpr(l)
 }
 
@@ -70,7 +70,7 @@ type unaryExpr struct {
 	right    interface{}
 }
 
-func (u *unaryExpr) accept(v visitor) interface{} {
+func (u *unaryExpr) accept(v expressionVisitor) interface{} {
 	return v.visitUnaryExpr(u)
 }
 

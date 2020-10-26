@@ -1,195 +1,246 @@
 package main
 
-import (
-	"fmt"
-)
-
 type parser struct {
-  tokens  []token
-  current int
+	tokens  []token
+	current int
 }
 
 func newParser(tokens []token) *parser {
-  return &parser{
-    tokens: tokens,
-    current: 0,
-  }
+	return &parser{
+		tokens:  tokens,
+		current: 0,
+	}
 }
 
-func (p *parser) parse() expr {
-  return p.expression()
+func (p *parser) parse() []stmt {
+	statements := make([]stmt, 0)
+
+	for !p.end() {
+		stmt, err := p.statement()
+
+		// Stop parsing - report the error
+		if err != nil {
+			reportParseError(err)
+			break
+		}
+
+		statements = append(statements, stmt)
+	}
+
+	return statements
 }
 
 func (p *parser) check(tType tokenType) bool {
-  if p.end() {
-    return false
-  }
+	if p.end() {
+		return false
+	}
 
-  return p.peek().variant == tType
+	return p.peek().variant == tType
 }
 
 func (p *parser) end() bool {
-  return p.peek().variant == EOF
+	return p.peek().variant == EOF
 }
 
 func (p *parser) next() token {
-  if !p.end() {
-    p.current++
-  }
+	if !p.end() {
+		p.current++
+	}
 
-  return p.prev()
+	return p.prev()
 }
 
 func (p *parser) peek() token {
-  return p.tokens[p.current]
+	return p.tokens[p.current]
 }
 
 func (p *parser) prev() token {
-  return p.tokens[p.current - 1]
+	return p.tokens[p.current-1]
 }
 
 func (p *parser) match(tTypes ...tokenType) bool {
-  for _, t := range tTypes {
-    if p.check(t) {
-      p.next()
-      return true
-    }
-  }
+	for _, t := range tTypes {
+		if p.check(t) {
+			p.next()
+			return true
+		}
+	}
 
-  return false
+	return false
+}
+
+// statement -> stmtStmt | printStmt;
+func (p *parser) statement() (stmt, *parseError) {
+	if p.match(PRINT) {
+		return p.printStmt()
+	}
+
+	return p.expressionStmt()
+}
+
+// stmtStmt -> stmtession ";";
+func (p *parser) expressionStmt() (stmt, *parseError) {
+	value := p.expression()
+
+	_, err := p.consume(SEMI, "Expected a ';' after expression.")
+	if err != nil {
+		return nil, err
+	}
+
+	expressionStmt := newExpressionStatement(value)
+
+	return expressionStmt, nil
+}
+
+// printStmt -> "print" stmtession ";";
+func (p *parser) printStmt() (stmt, *parseError) {
+	value := p.expression()
+
+	_, err := p.consume(SEMI, "Expected a ';' after value.")
+	if err != nil {
+		return nil, err
+	}
+
+	printStmt := newPrintStmt(value)
+
+	return printStmt, nil
 }
 
 // represents an expression statement
 func (p *parser) expression() expr {
-  return p.equality()
+	return p.equality()
 }
 
 // equality -> comparison ( ( "!=" | "==" ) comparison )*;
 func (p *parser) equality() expr {
-  expr := p.comparison()
+	expr := p.comparison()
 
-  for p.match(BANGEQUAL, EQUALEQUAL) {
-    operator := p.prev()
-    right := p.comparison()
-    expr = newBinaryExpr(expr, right, operator)
-  }
+	for p.match(BANGEQUAL, EQUALEQUAL) {
+		operator := p.prev()
+		right := p.comparison()
+		expr = newBinaryExpr(expr, right, operator)
+	}
 
-  return expr
+	return expr
 }
 
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
 func (p *parser) comparison() expr {
-  expr := p.term()
+	expr := p.term()
 
-  for p.match(GREATER, GREATEREQUAL, LESS, LESSEQUAL) {
-    operator := p.prev()
-    right := p.term()
-    expr = newBinaryExpr(expr, right, operator)
-  }
+	for p.match(GREATER, GREATEREQUAL, LESS, LESSEQUAL) {
+		operator := p.prev()
+		right := p.term()
+		expr = newBinaryExpr(expr, right, operator)
+	}
 
-  return expr
+	return expr
 }
 
 // term -> ( term ( "+" | "-" ) )*;
 func (p *parser) term() expr {
-  expr := p.factor()
+	expr := p.factor()
 
-  for p.match(MINUS, PLUS) {
-    operator := p.prev()
-    right := p.unary()
-    expr = newBinaryExpr(expr, right, operator)
-  }
+	for p.match(MINUS, PLUS) {
+		operator := p.prev()
+		right := p.unary()
+		expr = newBinaryExpr(expr, right, operator)
+	}
 
-  return expr
+	return expr
 }
 
 // factor -> ( term ( "/" | "*" ) term )*;
 func (p *parser) factor() expr {
-  expr := p.unary()
+	expr := p.unary()
 
-  for p.match(SLASH, STAR) {
-    operator := p.prev()
-    right := p.unary()
-    expr = newBinaryExpr(expr, right, operator)
-  }
+	for p.match(SLASH, STAR) {
+		operator := p.prev()
+		right := p.unary()
+		expr = newBinaryExpr(expr, right, operator)
+	}
 
-  return expr
+	return expr
 }
 
 // unary -> ( "!" | "-" ) unary | primary;
 func (p *parser) unary() expr {
-  if p.match(BANG, MINUS) {
-    operator := p.prev()
-    right := p.unary()
-    return newUnaryExpr(operator, right)
-  }
+	if p.match(BANG, MINUS) {
+		operator := p.prev()
+		right := p.unary()
+		return newUnaryExpr(operator, right)
+	}
 
-  parsed, err := p.primary()
+	parsed, err := p.primary()
 
-  if err != nil {
-    return nil
-  }
+	if err != nil {
+		return nil
+	}
 
-  return parsed
+	return parsed
 }
 
 // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
-func (p *parser) primary() (expr, error) {
-  if p.match(FALSE) {
-    return newLiteralExpr(false), nil
-  }
+func (p *parser) primary() (expr, *parseError) {
+	if p.match(FALSE) {
+		return newLiteralExpr(false), nil
+	}
 
-  if p.match(TRUE) {
-    return newLiteralExpr(true), nil
-  }
+	if p.match(TRUE) {
+		return newLiteralExpr(true), nil
+	}
 
-  if p.match(NIL) {
-    return newLiteralExpr(nil), nil
-  }
+	if p.match(NIL) {
+		return newLiteralExpr(nil), nil
+	}
 
-  if p.match(NUMBER, STRING) {
-    return newLiteralExpr(p.prev().literal), nil
-  }
+	if p.match(NUMBER, STRING) {
+		return newLiteralExpr(p.prev().literal), nil
+	}
 
-  if p.match(OPAREN) {
-    expr := p.expression()
-    p.consume(CPAREN, "expected ')' after expression.")
-    return newGroupingExpr(expr), nil
-  }
+	if p.match(OPAREN) {
+		expr := p.expression()
+		_, err := p.consume(CPAREN, "expected ')' after expression.")
 
-  return nil, fmt.Errorf("Expected expression: %v", p.peek())
+		if err != nil {
+			return nil, err
+		}
+
+		return newGroupingExpr(expr), nil
+	}
+
+	return nil, newParseError(p.peek(), "expected expression")
 }
 
-func (p *parser) consume(t tokenType, errorMsg string) token {
-  if p.check(t) {
-    return p.next()
-  }
+func (p *parser) consume(t tokenType, errorMsg string) (token, *parseError) {
+	if p.check(t) {
+		return p.next(), nil
+	}
 
-  parseError(p.peek(), errorMsg)
-  panic(fmt.Sprintf("found: %v, message: %s", p.peek(), errorMsg))
+	return token{}, newParseError(p.peek(), errorMsg)
 }
 
 // Synchronize when we've caught an error to the next valid token
 func (p *parser) synchronize() {
-  p.next()
+	p.next()
 
-  for !p.end() {
-    if p.prev().variant == SEMI {
-      return
-    }
+	for !p.end() {
+		if p.prev().variant == SEMI {
+			return
+		}
 
-    switch p.peek().variant {
-      case CLASS:
-      case FUN:
-      case VAR:
-      case FOR:
-      case IF:
-      case WHILE:
-      case PRINT:
-      case RETURN:
-        return
-    }
+		switch p.peek().variant {
+		case CLASS:
+		case FUN:
+		case VAR:
+		case FOR:
+		case IF:
+		case WHILE:
+		case PRINT:
+		case RETURN:
+			return
+		}
 
-    p.next()
-  }
+		p.next()
+	}
 }
