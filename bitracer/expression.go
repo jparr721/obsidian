@@ -5,14 +5,14 @@ type expressionVisitor interface {
 	visitGroupingExpr(*groupingExpr) interface{}
 	visitLiteralExpr(*literalExpr) interface{}
 	visitUnaryExpr(*unaryExpr) interface{}
+	visitVariableExpr(*variableExpr) interface{}
+	visitAssignExpr(*assignExpr) interface{}
 }
 
-// Expr repsents an interface underneath each expression statement
 type expr interface {
 	accept(expressionVisitor) interface{}
 }
 
-// binaryExpr is a recursive data structure representing a syntax tree
 type binaryExpr struct {
 	left     expr
 	operator token
@@ -23,7 +23,6 @@ func (b *binaryExpr) accept(v expressionVisitor) interface{} {
 	return v.visitBinaryExpr(b)
 }
 
-// newbinaryExpr creates a new binary expression given the parameters
 func newBinaryExpr(left, right expr, operator token) *binaryExpr {
 	return &binaryExpr{
 		left,
@@ -32,7 +31,6 @@ func newBinaryExpr(left, right expr, operator token) *binaryExpr {
 	}
 }
 
-// groupingExpr is a recursive data structure representing a syntax tree
 type groupingExpr struct {
 	expression interface{}
 }
@@ -41,14 +39,12 @@ func (g *groupingExpr) accept(v expressionVisitor) interface{} {
 	return v.visitGroupingExpr(g)
 }
 
-// newgroupingExpr creates a new grouping expression given the parameters
 func newGroupingExpr(expression interface{}) *groupingExpr {
 	return &groupingExpr{
 		expression,
 	}
 }
 
-// literalExpr is a recursive data structure representing a syntax tree
 type literalExpr struct {
 	value interface{}
 }
@@ -57,14 +53,12 @@ func (l *literalExpr) accept(v expressionVisitor) interface{} {
 	return v.visitLiteralExpr(l)
 }
 
-// newliteralExpr creates a new literal value given the parameters
 func newLiteralExpr(value interface{}) *literalExpr {
 	return &literalExpr{
 		value,
 	}
 }
 
-// unaryExpr is a recursive data structure representing a syntax tree
 type unaryExpr struct {
 	operator token
 	right    interface{}
@@ -74,10 +68,34 @@ func (u *unaryExpr) accept(v expressionVisitor) interface{} {
 	return v.visitUnaryExpr(u)
 }
 
-// newunaryExpr creates a new unary value given the parameters
 func newUnaryExpr(operator token, right interface{}) *unaryExpr {
 	return &unaryExpr{
 		operator,
 		right,
 	}
+}
+
+type variableExpr struct {
+	name token
+}
+
+func (ve *variableExpr) accept(v expressionVisitor) interface{} {
+	return v.visitVariableExpr(ve)
+}
+
+func newVariableExpr(name token) *variableExpr {
+	return &variableExpr{name}
+}
+
+type assignExpr struct {
+	name  token
+	value expr
+}
+
+func (a *assignExpr) accept(v expressionVisitor) interface{} {
+	return v.visitAssignExpr(a)
+}
+
+func newAssignExpr(name token, value expr) *assignExpr {
+	return &assignExpr{name, value}
 }

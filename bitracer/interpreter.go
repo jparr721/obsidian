@@ -6,10 +6,15 @@ import (
 	"strconv"
 )
 
-type interpreter struct{}
+type interpreter struct {
+	environment *environment
+}
+
+func newInterpreter() *interpreter {
+	return &interpreter{new(environment)}
+}
 
 func (i *interpreter) interpret(statements []stmt) {
-
 	for _, statement := range statements {
 		result := i.execute(statement)
 
@@ -39,6 +44,16 @@ func (i *interpreter) evaluate(e expr) interface{} {
 	return e.accept(i)
 }
 
+func (i *interpreter) visitVariableStmt(s *variableStmt) interface{} {
+	var value interface{}
+	if s.initializer != nil {
+		value = i.evaluate(s.initializer)
+	}
+
+	i.environment.define(s.name.lexeme, value)
+	return nil
+}
+
 func (i *interpreter) visitExpressionStmt(s *expressionStmt) interface{} {
 	i.evaluate(s.expression)
 	return nil
@@ -48,6 +63,26 @@ func (i *interpreter) visitPrintStmt(s *printStmt) interface{} {
 	value := i.evaluate(s.expression)
 	fmt.Println(i.stringify(value))
 	return nil
+}
+
+func (i *interpreter) visitAssignExpr(a *assignExpr) interface{} {
+	value := i.evaluate(a.value)
+
+	err := i.environment.assign(a.name, value)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *interpreter) visitVariableExpr(e *variableExpr) interface{} {
+	value, err := i.environment.get(e.name)
+
+	if err != nil {
+		return err
+	}
+
+	return value
 }
 
 func (i *interpreter) visitLiteralExpr(e *literalExpr) interface{} {

@@ -69,10 +69,56 @@ func (p *parser) match(tTypes ...tokenType) bool {
 	return false
 }
 
+// declaration -> varDecl | statement;
+func (p *parser) declaration() (stmt, *parseError) {
+	if p.match(VAR) {
+		value, err := p.varDeclaration()
+
+		if err != nil {
+			// unwind errors to next valid expression.
+			p.synchronize()
+			// Bubble up error regardless.
+			return nil, err
+		}
+
+		return value, nil
+	}
+
+	return p.statement()
+}
+
+func (p *parser) varDeclaration() (stmt, *parseError) {
+	name, err := p.consume(IDENTIFIER, "Expected variable name.")
+
+	if err != nil {
+		return nil, err
+	}
+
+	var initializer expr
+
+	if p.match(EQUAL) {
+		initializer = p.expression()
+	}
+
+	p.consume(SEMI, "Expected ';' after variable declaration")
+	variableStmt := newVariableStmt(name, initializer)
+	return variableStmt, nil
+}
+
 // statement -> stmtStmt | printStmt;
 func (p *parser) statement() (stmt, *parseError) {
 	if p.match(PRINT) {
 		return p.printStmt()
+	}
+
+	if p.match(OSQUIGGLE) {
+		statements, err := p.block()
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newBlockStmt(statements), nil
 	}
 
 	return p.expressionStmt()
@@ -104,6 +150,53 @@ func (p *parser) printStmt() (stmt, *parseError) {
 	printStmt := newPrintStmt(value)
 
 	return printStmt, nil
+}
+
+// block -> "{" declaration* "}";
+func (p *parser) block() ([]stmt, *parseError) {
+	statements := make([]stmt, 0)
+
+	for !p.check(CSQUIGGLE) && !p.end() {
+		declaration, err := p.declaration()
+
+		if err != nil {
+			return nil, err
+		}
+
+		statements = append(statements, declaration)
+	}
+
+	_, err := p.consume(CSQUIGGLE, "Expected '}' after block statement")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return statements, nil
+}
+
+// assignment -> IDENTIFIER "=" assignment | equality;
+func (p *parser) assignment() (expr, *parseError) {
+	expression := p.equality()
+
+	if p.match(EQUAL) {
+		equals := p.prev()
+		value, err := p.assignment()
+
+		if err != nil {
+			return nil, err
+		}
+
+		switch expression.(type) {
+		case *variableExpr:
+			name := expression.(*variableExpr).name
+			return newAssignExpr(name, value), nil
+		default:
+			return nil, newParseError(equals, "Invalid assignment target")
+		}
+	}
+
+	return expression, nil
 }
 
 // represents an expression statement
