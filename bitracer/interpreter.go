@@ -29,18 +29,18 @@ func (i *interpreter) interpret(statements []stmt) {
 }
 
 func (i *interpreter) executeBlock(statements []stmt, environment *environment) {
-  previous := i.environment
+	previous := i.environment
 
-  // Life into new environment context
-  i.environment = environment
+	// Life into new environment context
+	i.environment = environment
 
-  // Run everything in this scope
-  for _, statement := range statements {
-    i.execute(statement)
-  }
+	// Run everything in this scope
+	for _, statement := range statements {
+		i.execute(statement)
+	}
 
-  // Hand the environment back
-  i.environment = previous
+	// Hand the environment back
+	i.environment = previous
 }
 
 func (i *interpreter) execute(s stmt) interface{} {
@@ -60,8 +60,8 @@ func (i *interpreter) evaluate(e expr) interface{} {
 }
 
 func (i *interpreter) visitBlockStmt(s *blockStmt) interface{} {
-  i.executeBlock(s.statements, newEnvironment(i.environment))
-  return nil
+	i.executeBlock(s.statements, newEnvironment(i.environment))
+	return nil
 }
 
 func (i *interpreter) visitVariableStmt(s *variableStmt) interface{} {

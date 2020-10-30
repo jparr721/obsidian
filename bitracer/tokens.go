@@ -180,10 +180,10 @@ func tokenFromString(s string) tokenType {
 
 // token represents a token value in a file
 type token struct {
-	variant   tokenType
-	lexeme    string
-	literal   interface{}
-	line      int
+	variant tokenType
+	lexeme  string
+	literal interface{}
+	line    int
 }
 
 // newtoken creates a new token from a given input sequence of values

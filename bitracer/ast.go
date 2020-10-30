@@ -55,9 +55,9 @@ func (a *astPrinter) visitUnaryExpr(u *unaryExpr) interface{} {
 }
 
 func (a *astPrinter) visitVariableExpr(v *variableExpr) interface{} {
-  return a.parenthesize(v.name.lexeme)
+	return a.parenthesize(v.name.lexeme)
 }
 
 func (a *astPrinter) visitAssignExpr(ae *assignExpr) interface{} {
-  return a.parenthesize(ae.name.lexeme, ae.value)
+	return a.parenthesize(ae.name.lexeme, ae.value)
 }
