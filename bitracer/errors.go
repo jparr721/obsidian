@@ -16,7 +16,7 @@ func newRuntimeError(token token, message string) *runtimeError {
 }
 
 func (r *runtimeError) Error() string {
-	return fmt.Sprintf("[line %d] %s", r.token.line, r.message)
+	return fmt.Sprintf("RuntimeError: [line %d] %s", r.token.line, r.message)
 }
 
 func reportRuntimeError(e *runtimeError) {
@@ -42,7 +42,7 @@ func (p *parseError) Error() string {
 		pos = "at '" + p.token.lexeme + "'"
 	}
 
-	return fmt.Sprintf("[line %d] Error %s: %s\n", p.token.line, pos, p.message)
+	return fmt.Sprintf("ParseError: [line %d] Error %s: %s\n", p.token.line, pos, p.message)
 }
 
 func reportParseError(e *parseError) {

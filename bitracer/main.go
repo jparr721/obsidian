@@ -66,6 +66,6 @@ func run(fileContents string) {
 		return
 	}
 
-	interpreter := &interpreter{}
+	interpreter := newInterpreter()
 	interpreter.interpret(stmts)
 }

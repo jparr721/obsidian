@@ -53,3 +53,11 @@ func (a *astPrinter) visitLiteralExpr(l *literalExpr) interface{} {
 func (a *astPrinter) visitUnaryExpr(u *unaryExpr) interface{} {
 	return a.parenthesize(u.operator.lexeme, u.right)
 }
+
+func (a *astPrinter) visitVariableExpr(v *variableExpr) interface{} {
+  return a.parenthesize(v.name.lexeme)
+}
+
+func (a *astPrinter) visitAssignExpr(ae *assignExpr) interface{} {
+  return a.parenthesize(ae.name.lexeme, ae.value)
+}

@@ -28,11 +28,6 @@ func (t *tokenizer) scanTokens() []token {
 	for !t.end() {
 		t.start = t.current
 
-		// Prevents the last space from getting parsed
-		if t.current+1 >= len(t.src) {
-			break
-		}
-
 		t.scanToken()
 	}
 

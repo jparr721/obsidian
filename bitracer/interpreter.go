@@ -11,7 +11,7 @@ type interpreter struct {
 }
 
 func newInterpreter() *interpreter {
-	return &interpreter{new(environment)}
+	return &interpreter{newEnvironment(nil)}
 }
 
 func (i *interpreter) interpret(statements []stmt) {
@@ -28,8 +28,23 @@ func (i *interpreter) interpret(statements []stmt) {
 	}
 }
 
-func (i *interpreter) execute(stmt stmt) interface{} {
-	return stmt.accept(i)
+func (i *interpreter) executeBlock(statements []stmt, environment *environment) {
+  previous := i.environment
+
+  // Life into new environment context
+  i.environment = environment
+
+  // Run everything in this scope
+  for _, statement := range statements {
+    i.execute(statement)
+  }
+
+  // Hand the environment back
+  i.environment = previous
+}
+
+func (i *interpreter) execute(s stmt) interface{} {
+	return s.accept(i)
 }
 
 func (i *interpreter) stringify(evaluated interface{}) string {
@@ -42,6 +57,11 @@ func (i *interpreter) stringify(evaluated interface{}) string {
 
 func (i *interpreter) evaluate(e expr) interface{} {
 	return e.accept(i)
+}
+
+func (i *interpreter) visitBlockStmt(s *blockStmt) interface{} {
+  i.executeBlock(s.statements, newEnvironment(i.environment))
+  return nil
 }
 
 func (i *interpreter) visitVariableStmt(s *variableStmt) interface{} {

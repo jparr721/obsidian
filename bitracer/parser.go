@@ -16,7 +16,7 @@ func (p *parser) parse() []stmt {
 	statements := make([]stmt, 0)
 
 	for !p.end() {
-		stmt, err := p.statement()
+		stmt, err := p.declaration()
 
 		// Stop parsing - report the error
 		if err != nil {
@@ -97,7 +97,10 @@ func (p *parser) varDeclaration() (stmt, *parseError) {
 	var initializer expr
 
 	if p.match(EQUAL) {
-		initializer = p.expression()
+		initializer, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	p.consume(SEMI, "Expected ';' after variable declaration")
@@ -126,9 +129,12 @@ func (p *parser) statement() (stmt, *parseError) {
 
 // stmtStmt -> stmtession ";";
 func (p *parser) expressionStmt() (stmt, *parseError) {
-	value := p.expression()
+	value, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
 
-	_, err := p.consume(SEMI, "Expected a ';' after expression.")
+	_, err = p.consume(SEMI, "Expected a ';' after expression.")
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +146,12 @@ func (p *parser) expressionStmt() (stmt, *parseError) {
 
 // printStmt -> "print" stmtession ";";
 func (p *parser) printStmt() (stmt, *parseError) {
-	value := p.expression()
+	value, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
 
-	_, err := p.consume(SEMI, "Expected a ';' after value.")
+	_, err = p.consume(SEMI, "Expected a ';' after value.")
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +186,10 @@ func (p *parser) block() ([]stmt, *parseError) {
 
 // assignment -> IDENTIFIER "=" assignment | equality;
 func (p *parser) assignment() (expr, *parseError) {
-	expression := p.equality()
+	expression, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
 
 	if p.match(EQUAL) {
 		equals := p.prev()
@@ -200,77 +212,103 @@ func (p *parser) assignment() (expr, *parseError) {
 }
 
 // represents an expression statement
-func (p *parser) expression() expr {
-	return p.equality()
+func (p *parser) expression() (expr, *parseError) {
+	return p.assignment()
 }
 
 // equality -> comparison ( ( "!=" | "==" ) comparison )*;
-func (p *parser) equality() expr {
-	expr := p.comparison()
+func (p *parser) equality() (expr, *parseError) {
+	expr, err := p.comparison()
+	if err != nil {
+		return nil, err
+	}
 
 	for p.match(BANGEQUAL, EQUALEQUAL) {
 		operator := p.prev()
-		right := p.comparison()
+		right, err := p.comparison()
+		if err != nil {
+			return nil, err
+		}
 		expr = newBinaryExpr(expr, right, operator)
 	}
 
-	return expr
+	return expr, nil
 }
 
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
-func (p *parser) comparison() expr {
-	expr := p.term()
+func (p *parser) comparison() (expr, *parseError) {
+	expr, err := p.term()
+
+	if err != nil {
+		return nil, err
+	}
 
 	for p.match(GREATER, GREATEREQUAL, LESS, LESSEQUAL) {
 		operator := p.prev()
-		right := p.term()
+		right, err := p.term()
+		if err != nil {
+			return nil, err
+		}
+
 		expr = newBinaryExpr(expr, right, operator)
 	}
 
-	return expr
+	return expr, nil
 }
 
 // term -> ( term ( "+" | "-" ) )*;
-func (p *parser) term() expr {
-	expr := p.factor()
+func (p *parser) term() (expr, *parseError) {
+	expr, err := p.factor()
+	if err != nil {
+		return nil, err
+	}
 
 	for p.match(MINUS, PLUS) {
 		operator := p.prev()
-		right := p.unary()
+		right, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
 		expr = newBinaryExpr(expr, right, operator)
 	}
 
-	return expr
+	return expr, nil
 }
 
 // factor -> ( term ( "/" | "*" ) term )*;
-func (p *parser) factor() expr {
-	expr := p.unary()
+func (p *parser) factor() (expr, *parseError) {
+	expr, err := p.unary()
+	if err != nil {
+		return nil, err
+	}
 
 	for p.match(SLASH, STAR) {
 		operator := p.prev()
-		right := p.unary()
+		right, err := p.unary()
+
+		if err != nil {
+			return nil, err
+		}
+
 		expr = newBinaryExpr(expr, right, operator)
 	}
 
-	return expr
+	return expr, nil
 }
 
 // unary -> ( "!" | "-" ) unary | primary;
-func (p *parser) unary() expr {
+func (p *parser) unary() (expr, *parseError) {
 	if p.match(BANG, MINUS) {
 		operator := p.prev()
-		right := p.unary()
-		return newUnaryExpr(operator, right)
+		right, err := p.unary()
+		if err != nil {
+			return nil, err
+		}
+
+		return newUnaryExpr(operator, right), nil
 	}
 
-	parsed, err := p.primary()
-
-	if err != nil {
-		return nil
-	}
-
-	return parsed
+	return p.primary()
 }
 
 // primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
@@ -292,14 +330,21 @@ func (p *parser) primary() (expr, *parseError) {
 	}
 
 	if p.match(OPAREN) {
-		expr := p.expression()
-		_, err := p.consume(CPAREN, "expected ')' after expression.")
+		expr, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
 
+		_, err = p.consume(CPAREN, "expected ')' after expression.")
 		if err != nil {
 			return nil, err
 		}
 
 		return newGroupingExpr(expr), nil
+	}
+
+	if p.match(IDENTIFIER) {
+		return newVariableExpr(p.prev()), nil
 	}
 
 	return nil, newParseError(p.peek(), "expected expression")

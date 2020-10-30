@@ -8,8 +8,7 @@ type environment struct {
 }
 
 func newEnvironment(enclosing *environment) *environment {
-	var values map[string]interface{}
-	return &environment{enclosing, values}
+	return &environment{enclosing, make(map[string]interface{})}
 }
 
 // TODO(@jparr721) - Make values immutable
@@ -26,7 +25,7 @@ func (e *environment) get(name token) (interface{}, *runtimeError) {
 		return e.enclosing.get(name)
 	}
 
-	return nil, newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'"))
+	return nil, newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.lexeme))
 }
 
 func (e *environment) assign(name token, value interface{}) *runtimeError {
@@ -39,5 +38,5 @@ func (e *environment) assign(name token, value interface{}) *runtimeError {
 		return e.enclosing.assign(name, value)
 	}
 
-	return newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'"))
+	return newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.lexeme))
 }
