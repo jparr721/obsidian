@@ -13,7 +13,12 @@ func newEnvironment(enclosing *environment) *environment {
 
 // TODO(@jparr721) - Make values immutable
 func (e *environment) define(name string, value interface{}) {
-	e.values[name] = value
+	if value != nil {
+		e.values[name] = value
+		return
+	}
+
+	e.values[name] = nil
 }
 
 func (e *environment) get(name token) (interface{}, *runtimeError) {

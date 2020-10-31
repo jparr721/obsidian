@@ -12,7 +12,7 @@ func newParser(tokens []token) *parser {
 	}
 }
 
-func (p *parser) parse() []stmt {
+func (p *parser) parse() ([]stmt, *parseError) {
 	statements := make([]stmt, 0)
 
 	for !p.end() {
@@ -21,13 +21,13 @@ func (p *parser) parse() []stmt {
 		// Stop parsing - report the error
 		if err != nil {
 			reportParseError(err)
-			break
+			return nil, err
 		}
 
 		statements = append(statements, stmt)
 	}
 
-	return statements
+	return statements, nil
 }
 
 func (p *parser) check(tType tokenType) bool {

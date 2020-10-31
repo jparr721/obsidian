@@ -14,18 +14,23 @@ func newInterpreter() *interpreter {
 	return &interpreter{newEnvironment(nil)}
 }
 
-func (i *interpreter) interpret(statements []stmt) {
+func (i *interpreter) interpret(statements []stmt) bool {
+	didError := false
+
 	for _, statement := range statements {
 		result := i.execute(statement)
 
 		switch result.(type) {
 		case *runtimeError:
 			reportRuntimeError(result.(*runtimeError))
+			didError = true
 		case error:
 			coreDump(result)
 			panic("Internal compiler error, something seems to have slipped through the cracks. Please file a github issue with the core dump")
 		}
 	}
+
+	return didError
 }
 
 func (i *interpreter) executeBlock(statements []stmt, environment *environment) {
@@ -48,6 +53,10 @@ func (i *interpreter) execute(s stmt) interface{} {
 }
 
 func (i *interpreter) stringify(evaluated interface{}) string {
+	if evaluated == nil {
+		return "nil"
+	}
+
 	if reflect.TypeOf(evaluated).String() == "float64" {
 		return strconv.FormatFloat(evaluated.(float64), 'f', -1, 64)
 	}
