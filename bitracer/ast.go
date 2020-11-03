@@ -61,3 +61,7 @@ func (a *astPrinter) visitVariableExpr(v *variableExpr) interface{} {
 func (a *astPrinter) visitAssignExpr(ae *assignExpr) interface{} {
 	return a.parenthesize(ae.name.lexeme, ae.value)
 }
+
+func (a *astPrinter) visitLogicalExpr(l *logicalExpr) interface{} {
+	return a.parenthesize(l.operator.lexeme, l.left, l.right)
+}

@@ -58,6 +58,7 @@ func (r *repl) start() {
 		// If the statement fails to parse, do not attempt to interpret at all
 		_, err := parseStatements(tokenize(text))
 		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 

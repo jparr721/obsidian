@@ -7,6 +7,7 @@ type expressionVisitor interface {
 	visitUnaryExpr(*unaryExpr) interface{}
 	visitVariableExpr(*variableExpr) interface{}
 	visitAssignExpr(*assignExpr) interface{}
+	visitLogicalExpr(*logicalExpr) interface{}
 }
 
 type expr interface {
@@ -98,4 +99,18 @@ func (a *assignExpr) accept(v expressionVisitor) interface{} {
 
 func newAssignExpr(name token, value expr) *assignExpr {
 	return &assignExpr{name, value}
+}
+
+type logicalExpr struct {
+	left     expr
+	operator token
+	right    expr
+}
+
+func (l *logicalExpr) accept(v expressionVisitor) interface{} {
+	return v.visitLogicalExpr(l)
+}
+
+func newLogicalExpr(left, right expr, operator token) *logicalExpr {
+	return &logicalExpr{left, operator, right}
 }

@@ -110,8 +110,20 @@ func (p *parser) varDeclaration() (stmt, *parseError) {
 
 // statement -> stmtStmt | printStmt;
 func (p *parser) statement() (stmt, *parseError) {
+	if p.match(FOR) {
+		return p.forStatement()
+	}
+
+	if p.match(IF) {
+		return p.ifStatement()
+	}
+
 	if p.match(PRINT) {
 		return p.printStmt()
+	}
+
+	if p.match(WHILE) {
+		return p.whileStatement()
 	}
 
 	if p.match(OSQUIGGLE) {
@@ -127,6 +139,137 @@ func (p *parser) statement() (stmt, *parseError) {
 	return p.expressionStmt()
 }
 
+// for -> "for" "(" (varDecl | exprStmt | ";") expression?";" expression?";" statement ;
+func (p *parser) forStatement() (stmt, *parseError) {
+	p.consume(OPAREN, "Expected '(' after 'for'")
+	var err *parseError
+
+	// first clause in the for loop
+	var initializer stmt
+	if p.match(SEMI) {
+		initializer = nil
+	} else if p.match(VAR) {
+		initializer, err = p.varDeclaration()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		initializer, err = p.expressionStmt()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Second clause in the for loop
+	var condition expr
+	if !p.check(SEMI) {
+		condition, err = p.expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
+	p.consume(SEMI, "Expected ';' after loop condition")
+
+	// Third clause in the for loop
+	var increment expr
+	if !p.check(CPAREN) {
+		increment, err = p.expression()
+
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
+	_, err = p.consume(CPAREN, "Expected ')' after for clauses")
+
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.statement()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if increment != nil {
+		block := []stmt{
+			body,
+			newExpressionStmt(increment),
+		}
+		body = newBlockStmt(block)
+	}
+
+	if condition == nil {
+		condition = newLiteralExpr(true)
+	}
+
+	body = newWhileStmt(condition, body)
+
+	if initializer != nil {
+		block := []stmt{
+			initializer,
+			body,
+		}
+		body = newBlockStmt(block)
+	}
+
+	return body, nil
+}
+
+// while -> "while" "(" expression ")" statement;
+func (p *parser) whileStatement() (stmt, *parseError) {
+	p.consume(OPAREN, "Expected '(' after 'while'")
+	condition, err := p.expression()
+
+	if err != nil {
+		return nil, err
+	}
+
+	p.consume(CPAREN, "Expected ')' after condition")
+
+	body, err := p.statement()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return newWhileStmt(condition, body), nil
+}
+
+// if -> "if" "(" expression ")" statement ("else" statement)?;
+func (p *parser) ifStatement() (stmt, *parseError) {
+	p.consume(OPAREN, "Expected '(' after 'if'")
+	condition, err := p.expression()
+
+	if err != nil {
+		return nil, err
+	}
+
+	p.consume(CPAREN, "Expected ')' after if condition")
+
+	thenBranch, err := p.statement()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var elseBranch stmt
+	if p.match(ELSE) {
+		elseBranch, err = p.statement()
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return newIfStmt(condition, thenBranch, elseBranch), nil
+}
+
 // stmtStmt -> stmtession ";";
 func (p *parser) expressionStmt() (stmt, *parseError) {
 	value, err := p.expression()
@@ -139,7 +282,7 @@ func (p *parser) expressionStmt() (stmt, *parseError) {
 		return nil, err
 	}
 
-	expressionStmt := newExpressionStatement(value)
+	expressionStmt := newExpressionStmt(value)
 
 	return expressionStmt, nil
 }
@@ -186,7 +329,7 @@ func (p *parser) block() ([]stmt, *parseError) {
 
 // assignment -> IDENTIFIER "=" assignment | equality;
 func (p *parser) assignment() (expr, *parseError) {
-	expression, err := p.equality()
+	expression, err := p.or()
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +357,49 @@ func (p *parser) assignment() (expr, *parseError) {
 // represents an expression statement
 func (p *parser) expression() (expr, *parseError) {
 	return p.assignment()
+}
+
+// logical or -> logical and ("or" logical and)*
+func (p *parser) or() (expr, *parseError) {
+	expression, err := p.and()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for p.match(OR) {
+		operator := p.prev()
+		right, err := p.and()
+
+		if err != nil {
+			return nil, err
+		}
+
+		expression = newLogicalExpr(expression, right, operator)
+	}
+
+	return expression, nil
+}
+
+func (p *parser) and() (expr, *parseError) {
+	expression, err := p.equality()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for p.match(AND) {
+		operator := p.prev()
+		right, err := p.equality()
+
+		if err != nil {
+			return nil, err
+		}
+
+		expression = newLogicalExpr(expression, right, operator)
+	}
+
+	return expression, nil
 }
 
 // equality -> comparison ( ( "!=" | "==" ) comparison )*;

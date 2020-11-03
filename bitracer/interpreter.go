@@ -6,6 +6,8 @@ import (
 	"strconv"
 )
 
+//TODO(@jparr721) - This _really_ needs to use visitors with error propagation.
+
 type interpreter struct {
 	environment *environment
 }
@@ -68,6 +70,23 @@ func (i *interpreter) evaluate(e expr) interface{} {
 	return e.accept(i)
 }
 
+func (i *interpreter) visitWhileStmt(s *whileStmt) interface{} {
+	for i.isTruthy(i.evaluate(s.condition)) {
+		i.execute(s.body)
+	}
+
+	return nil
+}
+
+func (i *interpreter) visitIfStmt(s *ifStmt) interface{} {
+	if i.isTruthy(i.evaluate(s.condition)) {
+		i.execute(s.thenBranch)
+	} else if s.elseBranch != nil {
+		i.execute(s.elseBranch)
+	}
+	return nil
+}
+
 func (i *interpreter) visitBlockStmt(s *blockStmt) interface{} {
 	i.executeBlock(s.statements, newEnvironment(i.environment))
 	return nil
@@ -92,6 +111,22 @@ func (i *interpreter) visitPrintStmt(s *printStmt) interface{} {
 	value := i.evaluate(s.expression)
 	fmt.Println(i.stringify(value))
 	return nil
+}
+
+func (i *interpreter) visitLogicalExpr(a *logicalExpr) interface{} {
+	left := i.evaluate(a.left)
+
+	if a.operator.variant == OR {
+		if i.isTruthy(left) {
+			return left
+		}
+	} else {
+		if i.isTruthy(left) {
+			return left
+		}
+	}
+
+	return i.evaluate(a.right)
 }
 
 func (i *interpreter) visitAssignExpr(a *assignExpr) interface{} {

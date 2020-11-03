@@ -5,6 +5,8 @@ type stmtVisitor interface {
 	visitPrintStmt(*printStmt) interface{}
 	visitVariableStmt(*variableStmt) interface{}
 	visitBlockStmt(*blockStmt) interface{}
+	visitIfStmt(*ifStmt) interface{}
+	visitWhileStmt(*whileStmt) interface{}
 }
 
 type stmt interface {
@@ -16,7 +18,7 @@ type expressionStmt struct {
 	expression expr
 }
 
-func newExpressionStatement(e expr) *expressionStmt {
+func newExpressionStmt(e expr) *expressionStmt {
 	return &expressionStmt{e}
 }
 
@@ -62,4 +64,34 @@ func newBlockStmt(statements []stmt) *blockStmt {
 
 func (b *blockStmt) accept(v stmtVisitor) interface{} {
 	return v.visitBlockStmt(b)
+}
+
+// If Statement
+type ifStmt struct {
+	condition  expr
+	thenBranch stmt
+	elseBranch stmt
+}
+
+
+func newIfStmt(condition expr, thenBranch, elseBranch stmt) *ifStmt {
+	return &ifStmt{condition, thenBranch, elseBranch}
+}
+
+func (i *ifStmt) accept(v stmtVisitor) interface{} {
+	return v.visitIfStmt(i)
+}
+
+// While Statement
+type whileStmt struct {
+	condition expr
+	body stmt
+}
+
+func newWhileStmt(condition expr, body stmt) *whileStmt {
+	return &whileStmt{condition, body}
+}
+
+func (w *whileStmt) accept(v stmtVisitor) interface{} {
+	return v.visitWhileStmt(w)
 }
