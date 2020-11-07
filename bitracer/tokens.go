@@ -1,182 +1,7 @@
 package main
 
-import "fmt"
-
 // tokenType represents a token by enum position
 type tokenType int
-
-func (t tokenType) String() string {
-	switch t {
-	case OSQUIGGLE:
-		return "OSQUIGGLE"
-	case CSQUIGGLE:
-		return "CSQUIGGLE"
-	case OPAREN:
-		return "OPAREN"
-	case CPAREN:
-		return "CPAREN"
-	case COMMA:
-		return "COMMA"
-	case SEMI:
-		return "SEMI"
-	case DOT:
-		return "DOT"
-	case PLUS:
-		return "PLUS"
-	case MINUS:
-		return "MINUS"
-	case STAR:
-		return "STAR"
-	case SLASH:
-		return "SLASH"
-	case MODULO:
-		return "MODULO"
-	case BANG:
-		return "BANG"
-	case BANGEQUAL:
-		return "BANGEQUAL"
-	case EQUAL:
-		return "EQUAL"
-	case EQUALEQUAL:
-		return "EQUALEQUAL"
-	case GREATER:
-		return "GREATER"
-	case GREATEREQUAL:
-		return "GREATEREQUAL"
-	case LESS:
-		return "LESS"
-	case LESSEQUAL:
-		return "LESSEQUAL"
-	case IDENTIFIER:
-		return "IDENTIFIER"
-	case STRING:
-		return "STRING"
-	case NUMBER:
-		return "NUMBER"
-	case AND:
-		return "AND"
-	case CLASS:
-		return "CLASS"
-	case ELSE:
-		return "ELSE"
-	case FALSE:
-		return "FALSE"
-	case FUN:
-		return "FUN"
-	case FOR:
-		return "FOR"
-	case IF:
-		return "IF"
-	case NIL:
-		return "NIL"
-	case OR:
-		return "OR"
-	case PRINT:
-		return "PRINT"
-	case RETURN:
-		return "RETURN"
-	case SUPER:
-		return "SUPER"
-	case THIS:
-		return "THIS"
-	case TRUE:
-		return "TRUE"
-	case VAR:
-		return "VAR"
-	case WHILE:
-		return "WHILE"
-	case EOF:
-		return "EOF"
-	}
-
-	return "UNKNOWN"
-}
-
-func tokenFromString(s string) tokenType {
-	switch s {
-	case "OSQUIGGLE":
-		return OSQUIGGLE
-	case "CSQUIGGLE":
-		return CSQUIGGLE
-	case "OPAREN":
-		return OPAREN
-	case "CPAREN":
-		return CPAREN
-	case "COMMA":
-		return COMMA
-	case "SEMI":
-		return SEMI
-	case "DOT":
-		return DOT
-	case "PLUS":
-		return PLUS
-	case "MINUS":
-		return MINUS
-	case "STAR":
-		return STAR
-	case "SLASH":
-		return SLASH
-	case "MODULO":
-		return MODULO
-	case "BANG":
-		return BANG
-	case "BANGEQUAL":
-		return BANGEQUAL
-	case "EQUAL":
-		return EQUAL
-	case "EQUALEQUAL":
-		return EQUALEQUAL
-	case "GREATER":
-		return GREATER
-	case "GREATEREQUAL":
-		return GREATEREQUAL
-	case "LESS":
-		return LESS
-	case "LESSEQUAL":
-		return LESSEQUAL
-	case "IDENTIFIER":
-		return IDENTIFIER
-	case "STRING":
-		return STRING
-	case "NUMBER":
-		return NUMBER
-	case "AND":
-		return AND
-	case "CLASS":
-		return CLASS
-	case "ELSE":
-		return ELSE
-	case "FALSE":
-		return FALSE
-	case "FUN":
-		return FUN
-	case "FOR":
-		return FOR
-	case "IF":
-		return IF
-	case "NIL":
-		return NIL
-	case "OR":
-		return OR
-	case "PRINT":
-		return PRINT
-	case "RETURN":
-		return RETURN
-	case "SUPER":
-		return SUPER
-	case "THIS":
-		return THIS
-	case "TRUE":
-		return TRUE
-	case "VAR":
-		return VAR
-	case "WHILE":
-		return WHILE
-	case "EOF":
-		return EOF
-	}
-	return UNKNOWN
-}
 
 // token represents a token value in a file
 type token struct {
@@ -194,10 +19,6 @@ func newToken(tokenType tokenType, lexeme string, literal interface{}, line int)
 		literal,
 		line,
 	}
-}
-
-func (t token) String() string {
-	return fmt.Sprintf("%s %s %v", t.variant.String(), t.lexeme, t.literal)
 }
 
 const (
@@ -318,6 +139,9 @@ const (
 	// WHILE represents the while keyword
 	WHILE
 
+	// BREAK represents the break keyword
+	BREAK
+
 	// EOF represents the end of file
 	EOF
 
@@ -343,4 +167,5 @@ var keywords = map[string]tokenType{
 	"true":   TRUE,
 	"var":    VAR,
 	"while":  WHILE,
+	"break":  BREAK,
 }

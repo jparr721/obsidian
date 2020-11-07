@@ -1,5 +1,10 @@
 package main
 
+const (
+	inLoopStatement    = true
+	notInLoopStatement = false
+)
+
 type parser struct {
 	tokens  []token
 	current int
@@ -16,7 +21,7 @@ func (p *parser) parse() ([]stmt, *parseError) {
 	statements := make([]stmt, 0)
 
 	for !p.end() {
-		stmt, err := p.declaration()
+		stmt, err := p.declaration(notInLoopStatement)
 
 		// Stop parsing - report the error
 		if err != nil {
@@ -70,7 +75,7 @@ func (p *parser) match(tTypes ...tokenType) bool {
 }
 
 // declaration -> varDecl | statement;
-func (p *parser) declaration() (stmt, *parseError) {
+func (p *parser) declaration(inLoop bool) (stmt, *parseError) {
 	if p.match(VAR) {
 		value, err := p.varDeclaration()
 
@@ -84,7 +89,7 @@ func (p *parser) declaration() (stmt, *parseError) {
 		return value, nil
 	}
 
-	return p.statement()
+	return p.statement(inLoop)
 }
 
 func (p *parser) varDeclaration() (stmt, *parseError) {
@@ -109,7 +114,7 @@ func (p *parser) varDeclaration() (stmt, *parseError) {
 }
 
 // statement -> stmtStmt | printStmt;
-func (p *parser) statement() (stmt, *parseError) {
+func (p *parser) statement(inLoop bool) (stmt, *parseError) {
 	if p.match(FOR) {
 		return p.forStatement()
 	}
@@ -126,8 +131,12 @@ func (p *parser) statement() (stmt, *parseError) {
 		return p.whileStatement()
 	}
 
+	if p.match(BREAK) {
+		return p.breakStatement(inLoop)
+	}
+
 	if p.match(OSQUIGGLE) {
-		statements, err := p.block()
+		statements, err := p.block(inLoop)
 
 		if err != nil {
 			return nil, err
@@ -190,18 +199,15 @@ func (p *parser) forStatement() (stmt, *parseError) {
 		return nil, err
 	}
 
-	body, err := p.statement()
+	body, err := p.statement(inLoopStatement)
 
 	if err != nil {
 		return nil, err
 	}
 
+	// Append the increment to the bottom of the block if set
 	if increment != nil {
-		block := []stmt{
-			body,
-			newExpressionStmt(increment),
-		}
-		body = newBlockStmt(block)
+		body.(*blockStmt).statements = append(body.(*blockStmt).statements, newExpressionStmt(increment))
 	}
 
 	if condition == nil {
@@ -221,6 +227,22 @@ func (p *parser) forStatement() (stmt, *parseError) {
 	return body, nil
 }
 
+// break -> "break";
+func (p *parser) breakStatement(inLoop bool) (stmt, *parseError) {
+	if inLoop {
+		b := p.prev()
+		_, err := p.consume(SEMI, "Expected ';' after break statement")
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newBreakStmt(b), nil
+	}
+
+	return nil, newParseError(p.prev(), "Expected 'break' inside of while or for loop")
+}
+
 // while -> "while" "(" expression ")" statement;
 func (p *parser) whileStatement() (stmt, *parseError) {
 	p.consume(OPAREN, "Expected '(' after 'while'")
@@ -232,7 +254,7 @@ func (p *parser) whileStatement() (stmt, *parseError) {
 
 	p.consume(CPAREN, "Expected ')' after condition")
 
-	body, err := p.statement()
+	body, err := p.statement(inLoopStatement)
 
 	if err != nil {
 		return nil, err
@@ -252,7 +274,7 @@ func (p *parser) ifStatement() (stmt, *parseError) {
 
 	p.consume(CPAREN, "Expected ')' after if condition")
 
-	thenBranch, err := p.statement()
+	thenBranch, err := p.statement(notInLoopStatement)
 
 	if err != nil {
 		return nil, err
@@ -260,7 +282,7 @@ func (p *parser) ifStatement() (stmt, *parseError) {
 
 	var elseBranch stmt
 	if p.match(ELSE) {
-		elseBranch, err = p.statement()
+		elseBranch, err = p.statement(notInLoopStatement)
 
 		if err != nil {
 			return nil, err
@@ -305,17 +327,17 @@ func (p *parser) printStmt() (stmt, *parseError) {
 }
 
 // block -> "{" declaration* "}";
-func (p *parser) block() ([]stmt, *parseError) {
+func (p *parser) block(inLoop bool) ([]stmt, *parseError) {
 	statements := make([]stmt, 0)
 
 	for !p.check(CSQUIGGLE) && !p.end() {
-		declaration, err := p.declaration()
+		statement, err := p.declaration(inLoop)
 
 		if err != nil {
 			return nil, err
 		}
 
-		statements = append(statements, declaration)
+		statements = append(statements, statement)
 	}
 
 	_, err := p.consume(CSQUIGGLE, "Expected '}' after block statement")

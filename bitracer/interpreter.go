@@ -35,19 +35,25 @@ func (i *interpreter) interpret(statements []stmt) bool {
 	return didError
 }
 
-func (i *interpreter) executeBlock(statements []stmt, environment *environment) {
+func (i *interpreter) executeBlock(statements []stmt, environment *environment) bool {
 	previous := i.environment
 
-	// Life into new environment context
+	// Lift into new environment context
 	i.environment = environment
 
 	// Run everything in this scope
 	for _, statement := range statements {
+		switch statement.(type) {
+		case *breakStmt:
+			i.environment = previous
+			return true
+		}
 		i.execute(statement)
 	}
 
 	// Hand the environment back
 	i.environment = previous
+	return false
 }
 
 func (i *interpreter) execute(s stmt) interface{} {
@@ -70,9 +76,16 @@ func (i *interpreter) evaluate(e expr) interface{} {
 	return e.accept(i)
 }
 
+func (i *interpreter) visitBreakStmt(s *breakStmt) interface{} {
+	return newRuntimeError(s.instance, "'break' found outside of loop statement, please file an issue")
+}
+
 func (i *interpreter) visitWhileStmt(s *whileStmt) interface{} {
 	for i.isTruthy(i.evaluate(s.condition)) {
-		i.execute(s.body)
+		didBreak := i.execute(s.body).(bool)
+		if didBreak {
+			break
+		}
 	}
 
 	return nil
@@ -88,8 +101,7 @@ func (i *interpreter) visitIfStmt(s *ifStmt) interface{} {
 }
 
 func (i *interpreter) visitBlockStmt(s *blockStmt) interface{} {
-	i.executeBlock(s.statements, newEnvironment(i.environment))
-	return nil
+	return i.executeBlock(s.statements, newEnvironment(i.environment))
 }
 
 func (i *interpreter) visitVariableStmt(s *variableStmt) interface{} {
