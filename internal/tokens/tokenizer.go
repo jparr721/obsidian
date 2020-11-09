@@ -1,4 +1,4 @@
-package main
+package tokens
 
 import (
 	"fmt"
@@ -6,94 +6,102 @@ import (
 	"strconv"
 )
 
-type tokenizer struct {
+// Tokenizer represents the PL tokenizer
+type Tokenizer struct {
 	src     string
-	tokens  []token
+	Tokens  []Token
 	start   int
 	current int
 	line    int
 }
 
-func newTokenizer(src string) *tokenizer {
-	return &tokenizer{
+// NewTokenizer creates a new tokenizer from a source string of values
+func NewTokenizer(src string) *Tokenizer {
+	return &Tokenizer{
 		src:     src,
-		tokens:  make([]token, 0),
+		Tokens:  make([]Token, 0),
 		start:   0,
 		current: 0,
 		line:    1,
 	}
 }
 
-func (t *tokenizer) scanTokens() []token {
+// ScanTokens scans the internal token array and reports errors, or the scanned tokens if successful
+func (t *Tokenizer) ScanTokens() ([]Token, *TokenizerError) {
 	for !t.end() {
 		t.start = t.current
 
-		t.scanToken()
+		err := t.scanToken()
+
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
-	t.tokens = append(t.tokens, newToken(EOF, "", nil, t.line))
-	return t.tokens
+	t.Tokens = append(t.Tokens, NewToken(TokenEOF, "", nil, t.line))
+	return t.Tokens, nil
 }
 
-func (t *tokenizer) scanToken() {
+func (t *Tokenizer) scanToken() *TokenizerError {
 	c := t.next()
 	switch c {
 	case "(":
-		t.addToken(OPAREN, nil)
+		t.addToken(TokenOparen, nil)
 		break
 	case ")":
-		t.addToken(CPAREN, nil)
+		t.addToken(TokenCparen, nil)
 		break
 	case "{":
-		t.addToken(OSQUIGGLE, nil)
+		t.addToken(TokenOsquiggle, nil)
 		break
 	case "}":
-		t.addToken(CSQUIGGLE, nil)
+		t.addToken(TokenCsquiggle, nil)
 		break
 	case ",":
-		t.addToken(COMMA, nil)
+		t.addToken(TokenComma, nil)
 		break
 	case ".":
-		t.addToken(DOT, nil)
+		t.addToken(TokenDot, nil)
 		break
 	case "-":
-		t.addToken(MINUS, nil)
+		t.addToken(TokenMinus, nil)
 		break
 	case "+":
-		t.addToken(PLUS, nil)
+		t.addToken(TokenPlus, nil)
 		break
 	case ";":
-		t.addToken(SEMI, nil)
+		t.addToken(TokenSemi, nil)
 		break
 	case "*":
-		t.addToken(STAR, nil)
+		t.addToken(TokenStar, nil)
 		break
 	case "!":
 		if t.match("=") {
-			t.addToken(BANGEQUAL, nil)
+			t.addToken(TokenBangEqual, nil)
 		} else {
-			t.addToken(BANG, nil)
+			t.addToken(TokenBang, nil)
 		}
 		break
 	case "=":
 		if t.match("=") {
-			t.addToken(EQUALEQUAL, nil)
+			t.addToken(TokenEqualEqual, nil)
 		} else {
-			t.addToken(EQUAL, nil)
+			t.addToken(TokenEqual, nil)
 		}
 		break
 	case "<":
 		if t.match("=") {
-			t.addToken(LESSEQUAL, nil)
+			t.addToken(TokenLessEqual, nil)
 		} else {
-			t.addToken(LESS, nil)
+			t.addToken(TokenLess, nil)
 		}
 		break
 	case ">":
 		if t.match("=") {
-			t.addToken(GREATEREQUAL, nil)
+			t.addToken(TokenGreaterEqual, nil)
 		} else {
-			t.addToken(GREATER, nil)
+			t.addToken(TokenGreater, nil)
 		}
 		break
 	case "/":
@@ -102,7 +110,7 @@ func (t *tokenizer) scanToken() {
 				t.next()
 			}
 		} else {
-			t.addToken(SLASH, nil)
+			t.addToken(TokenSlash, nil)
 		}
 		break
 	case " ":
@@ -122,47 +130,49 @@ func (t *tokenizer) scanToken() {
 		} else if t.isAlphaOrUnderscore(c) {
 			t.parseIdentifier()
 		} else {
-			lineError(t.line, fmt.Sprintf("Unexpected character: %s", c))
+			return newTokenizerError(t.line, fmt.Sprintf("Unexpected character: %s", c))
 		}
 		break
 	}
+
+	return nil
 }
 
-func (t *tokenizer) isAlphaOrUnderscore(c string) bool {
+func (t *Tokenizer) isAlphaOrUnderscore(c string) bool {
 	reg, err := regexp.Compile("^[a-zA-Z0-9_]+")
 
 	if err != nil {
-		lineError(t.line, err.Error())
+		newTokenizerError(t.line, err.Error())
 		return false
 	}
 
 	return reg.MatchString(c)
 }
 
-func (t *tokenizer) isDigit(c string) bool {
+func (t *Tokenizer) isDigit(c string) bool {
 	if _, err := strconv.Atoi(c); err == nil {
 		return true
 	}
 	return false
 }
 
-func (t *tokenizer) parseIdentifier() {
+func (t *Tokenizer) parseIdentifier() {
 	for t.isAlphaOrUnderscore(t.peek()) {
 		t.next()
 	}
 
 	text := t.src[t.start:t.current]
-	tokenType, ok := keywords[text]
+	TokenType, ok := Keywords[text]
 
 	if !ok {
-		t.addToken(IDENTIFIER, nil)
+		t.addToken(TokenIdentifier, nil)
 		return
 	}
 
-	t.addToken(tokenType, nil)
+	t.addToken(TokenType, nil)
 }
 
-func (t *tokenizer) parseNumber() {
+func (t *Tokenizer) parseNumber() {
 	for t.isDigit(t.peek()) {
 		t.next()
 	}
@@ -180,13 +190,13 @@ func (t *tokenizer) parseNumber() {
 	value, err := strconv.ParseFloat(t.src[t.start:t.current], 64)
 
 	if err != nil {
-		lineError(t.line, err.Error())
+		newTokenizerError(t.line, err.Error())
 	}
 
-	t.addToken(NUMBER, value)
+	t.addToken(TokenNumber, value)
 }
 
-func (t *tokenizer) parseString() {
+func (t *Tokenizer) parseString() {
 	for t.peek() != "\"" && !t.end() {
 		if t.peek() == "\\n" {
 			t.line++
@@ -195,7 +205,7 @@ func (t *tokenizer) parseString() {
 	}
 
 	if t.end() {
-		lineError(t.line, "Unexpected string.")
+		newTokenizerError(t.line, "Unexpected string.")
 		return
 	}
 
@@ -203,10 +213,10 @@ func (t *tokenizer) parseString() {
 
 	// Trim quotes
 	value := t.src[t.start+1 : t.current-1]
-	t.addToken(STRING, value)
+	t.addToken(TokenString, value)
 }
 
-func (t *tokenizer) peek() string {
+func (t *Tokenizer) peek() string {
 	if t.end() {
 		return "\\0"
 	}
@@ -214,7 +224,7 @@ func (t *tokenizer) peek() string {
 	return string(t.src[t.current])
 }
 
-func (t *tokenizer) peekNext() string {
+func (t *Tokenizer) peekNext() string {
 	if t.end() {
 		return "\\0"
 	}
@@ -222,7 +232,7 @@ func (t *tokenizer) peekNext() string {
 	return string(t.src[t.current+1])
 }
 
-func (t *tokenizer) match(expected string) bool {
+func (t *Tokenizer) match(expected string) bool {
 	if t.end() {
 		return false
 	}
@@ -235,16 +245,16 @@ func (t *tokenizer) match(expected string) bool {
 	return true
 }
 
-func (t *tokenizer) addToken(tokenType tokenType, literal interface{}) {
+func (t *Tokenizer) addToken(TokenType TokenType, literal interface{}) {
 	text := t.src[t.start:t.current]
-	t.tokens = append(t.tokens, newToken(tokenType, text, literal, t.line))
+	t.Tokens = append(t.Tokens, NewToken(TokenType, text, literal, t.line))
 }
 
-func (t *tokenizer) next() string {
+func (t *Tokenizer) next() string {
 	t.current++
 	return string(t.src[t.current-1])
 }
 
-func (t *tokenizer) end() bool {
+func (t *Tokenizer) end() bool {
 	return t.current >= len(t.src)
 }

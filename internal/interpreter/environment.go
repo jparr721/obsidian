@@ -1,6 +1,10 @@
-package main
+package interpreter
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/jparr721/obsidian/internal/tokens"
+)
 
 type environment struct {
 	enclosing *environment
@@ -21,8 +25,8 @@ func (e *environment) define(name string, value interface{}) {
 	e.values[name] = nil
 }
 
-func (e *environment) get(name token) (interface{}, *runtimeError) {
-	if value, ok := e.values[name.lexeme]; ok {
+func (e *environment) get(name tokens.Token) (interface{}, *RuntimeError) {
+	if value, ok := e.values[name.Lexeme]; ok {
 		return value, nil
 	}
 
@@ -30,12 +34,12 @@ func (e *environment) get(name token) (interface{}, *runtimeError) {
 		return e.enclosing.get(name)
 	}
 
-	return nil, newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.lexeme))
+	return nil, newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.Lexeme))
 }
 
-func (e *environment) assign(name token, value interface{}) *runtimeError {
-	if _, ok := e.values[name.lexeme]; ok {
-		e.values[name.lexeme] = value
+func (e *environment) assign(name tokens.Token, value interface{}) error {
+	if _, ok := e.values[name.Lexeme]; ok {
+		e.values[name.Lexeme] = value
 		return nil
 	}
 
@@ -43,5 +47,5 @@ func (e *environment) assign(name token, value interface{}) *runtimeError {
 		return e.enclosing.assign(name, value)
 	}
 
-	return newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.lexeme))
+	return newRuntimeError(name, fmt.Sprintf("Undefined variable '%s'", name.Lexeme))
 }
