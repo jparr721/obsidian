@@ -13,11 +13,12 @@ import (
 //TODO(@jparr721) - This _really_ needs to use Visitors with error propagation.
 
 type interpreter struct {
-	environment *environment
+	environment  *environment
+	loopDidBreak bool
 }
 
 func NewInterpreter() *interpreter {
-	return &interpreter{NewEnvironment(nil)}
+	return &interpreter{NewEnvironment(nil), false}
 }
 
 func (i *interpreter) Interpret(statements []statement.Statement) error {
@@ -25,6 +26,7 @@ func (i *interpreter) Interpret(statements []statement.Statement) error {
 		_, err := i.execute(statement)
 
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 	}
@@ -40,6 +42,11 @@ func (i *interpreter) executeBlock(statements []statement.Statement, environment
 
 	// Run everything in this scope
 	for _, statement := range statements {
+		if reflect.TypeOf(statement).String() == "*statement.BreakStatement" {
+			i.loopDidBreak = true
+			break
+		}
+
 		_, err := i.execute(statement)
 		if err != nil {
 			return err
@@ -72,11 +79,16 @@ func (i *interpreter) evaluate(e expression.Expression) (interface{}, error) {
 }
 
 func (i *interpreter) VisitBreakStatement(s *statement.BreakStatement) (interface{}, error) {
-	return nil, newRuntimeError(s.Instance, "'break' found outside of loop statement, please file an issue")
+	return nil, nil
 }
 
 func (i *interpreter) VisitWhileStatement(s *statement.WhileStatement) (interface{}, error) {
 	for {
+		if i.loopDidBreak {
+			i.loopDidBreak = false
+			break
+		}
+
 		cond, err := i.evaluate(s.Condition)
 
 		if err != nil {
