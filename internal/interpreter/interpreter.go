@@ -17,7 +17,7 @@ type interpreter struct {
 }
 
 func NewInterpreter() *interpreter {
-	return &interpreter{newEnvironment(nil)}
+	return &interpreter{NewEnvironment(nil)}
 }
 
 func (i *interpreter) Interpret(statements []statement.Statement) error {
@@ -114,7 +114,7 @@ func (i *interpreter) VisitIfStatement(s *statement.IfStatement) (interface{}, e
 }
 
 func (i *interpreter) VisitBlockStatement(s *statement.BlockStatement) (interface{}, error) {
-	return nil, i.executeBlock(s.Statements, newEnvironment(i.environment))
+	return nil, i.executeBlock(s.Statements, NewEnvironment(i.environment))
 }
 
 func (i *interpreter) VisitVariableStatement(s *statement.VariableStatement) (interface{}, error) {

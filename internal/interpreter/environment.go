@@ -11,7 +11,7 @@ type environment struct {
 	values    map[string]interface{}
 }
 
-func newEnvironment(enclosing *environment) *environment {
+func NewEnvironment(enclosing *environment) *environment {
 	return &environment{enclosing, make(map[string]interface{})}
 }
 
@@ -25,7 +25,7 @@ func (e *environment) define(name string, value interface{}) {
 	e.values[name] = nil
 }
 
-func (e *environment) get(name tokens.Token) (interface{}, *RuntimeError) {
+func (e *environment) get(name tokens.Token) (interface{}, error) {
 	if value, ok := e.values[name.Lexeme]; ok {
 		return value, nil
 	}

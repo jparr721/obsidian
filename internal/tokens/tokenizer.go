@@ -106,7 +106,7 @@ func (t *Tokenizer) scanToken() *TokenizerError {
 		break
 	case "/":
 		if t.match("/") {
-			for t.peek() != "\\n" && !t.end() {
+			for t.peek() != "\n" && !t.end() {
 				t.next()
 			}
 		} else {

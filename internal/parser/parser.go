@@ -14,6 +14,7 @@ const (
 type parser struct {
 	tokens  []tokens.Token
 	current int
+	inLoop  bool
 }
 
 func NewParser(tokens []tokens.Token) *parser {
@@ -27,7 +28,7 @@ func (p *parser) Parse() ([]statement.Statement, *ParseError) {
 	statements := make([]statement.Statement, 0)
 
 	for !p.end() {
-		statement, err := p.declaration(notInLoopStatement)
+		statement, err := p.declaration()
 
 		// Stop parsing - report the error
 		if err != nil {
@@ -81,7 +82,7 @@ func (p *parser) match(tTypes ...tokens.TokenType) bool {
 }
 
 // declaration -> varDecl | statement;
-func (p *parser) declaration(inLoop bool) (statement.Statement, *ParseError) {
+func (p *parser) declaration() (statement.Statement, *ParseError) {
 	if p.match(tokens.TokenVar) {
 		value, err := p.varDeclaration()
 
@@ -95,7 +96,7 @@ func (p *parser) declaration(inLoop bool) (statement.Statement, *ParseError) {
 		return value, nil
 	}
 
-	return p.statement(inLoop)
+	return p.statement()
 }
 
 func (p *parser) varDeclaration() (statement.Statement, *ParseError) {
@@ -120,7 +121,7 @@ func (p *parser) varDeclaration() (statement.Statement, *ParseError) {
 }
 
 // statement -> statement.StatementStatement | printStatement;
-func (p *parser) statement(inLoop bool) (statement.Statement, *ParseError) {
+func (p *parser) statement() (statement.Statement, *ParseError) {
 	if p.match(tokens.TokenFor) {
 		return p.forStatement()
 	}
@@ -138,11 +139,11 @@ func (p *parser) statement(inLoop bool) (statement.Statement, *ParseError) {
 	}
 
 	if p.match(tokens.TokenBreak) {
-		return p.breakStatement(inLoop)
+		return p.breakStatement()
 	}
 
 	if p.match(tokens.TokenOsquiggle) {
-		statements, err := p.block(inLoop)
+		statements, err := p.block()
 
 		if err != nil {
 			return nil, err
@@ -156,6 +157,7 @@ func (p *parser) statement(inLoop bool) (statement.Statement, *ParseError) {
 
 // for -> "for" "(" (varDecl | exprStatement | ";") expression?";" expression?";" statement ;
 func (p *parser) forStatement() (statement.Statement, *ParseError) {
+	p.inLoop = true
 	p.consume(tokens.TokenOparen, "Expected '(' after 'for'")
 	var err *ParseError
 
@@ -205,7 +207,7 @@ func (p *parser) forStatement() (statement.Statement, *ParseError) {
 		return nil, err
 	}
 
-	body, err := p.statement(inLoopStatement)
+	body, err := p.statement()
 
 	if err != nil {
 		return nil, err
@@ -230,12 +232,14 @@ func (p *parser) forStatement() (statement.Statement, *ParseError) {
 		body = statement.NewBlockStatement(block)
 	}
 
+	p.inLoop = false
+
 	return body, nil
 }
 
 // break -> "break";
-func (p *parser) breakStatement(inLoop bool) (statement.Statement, *ParseError) {
-	if inLoop {
+func (p *parser) breakStatement() (statement.Statement, *ParseError) {
+	if p.inLoop {
 		b := p.prev()
 		_, err := p.consume(tokens.TokenSemi, "Expected ';' after break statement")
 
@@ -251,6 +255,7 @@ func (p *parser) breakStatement(inLoop bool) (statement.Statement, *ParseError) 
 
 // while -> "while" "(" expression ")" statement;
 func (p *parser) whileStatement() (statement.Statement, *ParseError) {
+	p.inLoop = true
 	p.consume(tokens.TokenOparen, "Expected '(' after 'while'")
 	condition, err := p.expression()
 
@@ -260,11 +265,13 @@ func (p *parser) whileStatement() (statement.Statement, *ParseError) {
 
 	p.consume(tokens.TokenCparen, "Expected ')' after condition")
 
-	body, err := p.statement(inLoopStatement)
+	body, err := p.statement()
 
 	if err != nil {
 		return nil, err
 	}
+
+	p.inLoop = false
 
 	return statement.NewWhileStatement(condition, body), nil
 }
@@ -280,7 +287,7 @@ func (p *parser) ifStatement() (statement.Statement, *ParseError) {
 
 	p.consume(tokens.TokenCparen, "Expected ')' after if condition")
 
-	thenBranch, err := p.statement(notInLoopStatement)
+	thenBranch, err := p.statement()
 
 	if err != nil {
 		return nil, err
@@ -288,7 +295,7 @@ func (p *parser) ifStatement() (statement.Statement, *ParseError) {
 
 	var elseBranch statement.Statement
 	if p.match(tokens.TokenElse) {
-		elseBranch, err = p.statement(notInLoopStatement)
+		elseBranch, err = p.statement()
 
 		if err != nil {
 			return nil, err
@@ -333,11 +340,11 @@ func (p *parser) printStatement() (statement.Statement, *ParseError) {
 }
 
 // block -> "{" declaration* "}";
-func (p *parser) block(inLoop bool) ([]statement.Statement, *ParseError) {
+func (p *parser) block() ([]statement.Statement, *ParseError) {
 	statements := make([]statement.Statement, 0)
 
 	for !p.check(tokens.TokenCsquiggle) && !p.end() {
-		statement, err := p.declaration(inLoop)
+		statement, err := p.declaration()
 
 		if err != nil {
 			return nil, err
