@@ -10,6 +10,7 @@ type Visitor interface {
 	VisitVariableExpression(*VariableExpression) (interface{}, error)
 	VisitAssignExpression(*AssignExpression) (interface{}, error)
 	VisitLogicalExpression(*LogicalExpression) (interface{}, error)
+	VisitCallExpression(*CallExpression) (interface{}, error)
 }
 
 type Expression interface {
@@ -115,4 +116,21 @@ func (l *LogicalExpression) Accept(v Visitor) (interface{}, error) {
 
 func NewLogicalExpression(left, right Expression, operator tokens.Token) *LogicalExpression {
 	return &LogicalExpression{left, operator, right}
+}
+
+// CallExpression represents a callable expression
+type CallExpression struct {
+	Callee    Expression
+	Paren     tokens.Token
+	Arguments []Expression
+}
+
+// Accept handles call expression instances
+func (c *CallExpression) Accept(v Visitor) (interface{}, error) {
+	return v.VisitCallExpression(c)
+}
+
+// NewCallExpression makes a new call statement from provided input
+func NewCallExpression(callee Expression, paren tokens.Token, arguments []Expression) *CallExpression {
+	return &CallExpression{callee, paren, arguments}
 }

@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/jparr721/obsidian/internal/expression"
 	"github.com/jparr721/obsidian/internal/statement"
 	"github.com/jparr721/obsidian/internal/tokens"
@@ -11,20 +13,24 @@ const (
 	notInLoopStatement = false
 )
 
-type parser struct {
+// Parser represents the Obsidian recurisve descent parser
+type Parser struct {
 	tokens  []tokens.Token
 	current int
 	inLoop  bool
 }
 
-func NewParser(tokens []tokens.Token) *parser {
-	return &parser{
+// NewParser creates a new parsing object for a list of tokens
+func NewParser(tokens []tokens.Token) *Parser {
+	return &Parser{
 		tokens:  tokens,
 		current: 0,
 	}
 }
 
-func (p *parser) Parse() ([]statement.Statement, *ParseError) {
+// Parse initiates the recurisve descent parser on a supplied list of tokens
+// this function returns a ParseError in the event that something fails
+func (p *Parser) Parse() ([]statement.Statement, *ParseError) {
 	statements := make([]statement.Statement, 0)
 
 	for !p.end() {
@@ -42,7 +48,7 @@ func (p *parser) Parse() ([]statement.Statement, *ParseError) {
 	return statements, nil
 }
 
-func (p *parser) check(tType tokens.TokenType) bool {
+func (p *Parser) check(tType tokens.TokenType) bool {
 	if p.end() {
 		return false
 	}
@@ -50,11 +56,11 @@ func (p *parser) check(tType tokens.TokenType) bool {
 	return p.peek().Variant == tType
 }
 
-func (p *parser) end() bool {
+func (p *Parser) end() bool {
 	return p.peek().Variant == tokens.TokenEOF
 }
 
-func (p *parser) next() tokens.Token {
+func (p *Parser) next() tokens.Token {
 	if !p.end() {
 		p.current++
 	}
@@ -62,15 +68,15 @@ func (p *parser) next() tokens.Token {
 	return p.prev()
 }
 
-func (p *parser) peek() tokens.Token {
+func (p *Parser) peek() tokens.Token {
 	return p.tokens[p.current]
 }
 
-func (p *parser) prev() tokens.Token {
+func (p *Parser) prev() tokens.Token {
 	return p.tokens[p.current-1]
 }
 
-func (p *parser) match(tTypes ...tokens.TokenType) bool {
+func (p *Parser) match(tTypes ...tokens.TokenType) bool {
 	for _, t := range tTypes {
 		if p.check(t) {
 			p.next()
@@ -82,7 +88,10 @@ func (p *parser) match(tTypes ...tokens.TokenType) bool {
 }
 
 // declaration -> varDecl | statement;
-func (p *parser) declaration() (statement.Statement, *ParseError) {
+func (p *Parser) declaration() (statement.Statement, *ParseError) {
+	if p.match(tokens.TokenFun) {
+		return p.function("function")
+	}
 	if p.match(tokens.TokenVar) {
 		value, err := p.varDeclaration()
 
@@ -99,7 +108,78 @@ func (p *parser) declaration() (statement.Statement, *ParseError) {
 	return p.statement()
 }
 
-func (p *parser) varDeclaration() (statement.Statement, *ParseError) {
+// return -> "return" expression? ";";
+func (p *Parser) ret() (statement.Statement, *ParseError) {
+	var err *ParseError
+
+	keyword := p.prev()
+	var value expression.Expression
+
+	if !p.check(tokens.TokenSemi) {
+		value, err = p.expression()
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.consume(tokens.TokenSemi, "Expected ';' after return value")
+	return statement.NewReturnStatement(keyword, value), nil
+}
+
+// function -> identifier "(" parameters ")" block;
+func (p *Parser) function(kind string) (statement.Statement, *ParseError) {
+	name, err := p.consume(tokens.TokenIdentifier, fmt.Sprintf("Expected %s name.", kind))
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(tokens.TokenOparen, fmt.Sprintf("Expected '(' after %s name.", kind))
+
+	if err != nil {
+		return nil, err
+	}
+
+	arguments := make([]tokens.Token, 0)
+
+	if !p.check(tokens.TokenCparen) {
+		for remainingArgs := true; remainingArgs; remainingArgs = p.match(tokens.TokenComma) {
+			if len(arguments) >= 255 {
+				return nil, newParseError(p.peek(), "A function cannot have more than 255 arguments.")
+			}
+
+			arg, err := p.consume(tokens.TokenIdentifier, "Expected argument name.")
+
+			if err != nil {
+				return nil, err
+			}
+
+			arguments = append(arguments, arg)
+		}
+	}
+	_, err = p.consume(tokens.TokenCparen, "Expected ')' after argument list.")
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(tokens.TokenOsquiggle, fmt.Sprintf("Expected '{' before %s body.", kind))
+
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.block()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return statement.NewFunctionStatement(name, arguments, body), nil
+}
+
+func (p *Parser) varDeclaration() (statement.Statement, *ParseError) {
 	name, err := p.consume(tokens.TokenIdentifier, "Expected variable name.")
 
 	if err != nil {
@@ -121,7 +201,7 @@ func (p *parser) varDeclaration() (statement.Statement, *ParseError) {
 }
 
 // statement -> statement.StatementStatement | printStatement;
-func (p *parser) statement() (statement.Statement, *ParseError) {
+func (p *Parser) statement() (statement.Statement, *ParseError) {
 	if p.match(tokens.TokenFor) {
 		return p.forStatement()
 	}
@@ -132,6 +212,10 @@ func (p *parser) statement() (statement.Statement, *ParseError) {
 
 	if p.match(tokens.TokenPrint) {
 		return p.printStatement()
+	}
+
+	if p.match(tokens.TokenReturn) {
+		return p.ret()
 	}
 
 	if p.match(tokens.TokenWhile) {
@@ -156,7 +240,7 @@ func (p *parser) statement() (statement.Statement, *ParseError) {
 }
 
 // for -> "for" "(" (varDecl | exprStatement | ";") expression?";" expression?";" statement ;
-func (p *parser) forStatement() (statement.Statement, *ParseError) {
+func (p *Parser) forStatement() (statement.Statement, *ParseError) {
 	p.inLoop = true
 	p.consume(tokens.TokenOparen, "Expected '(' after 'for'")
 	var err *ParseError
@@ -238,7 +322,7 @@ func (p *parser) forStatement() (statement.Statement, *ParseError) {
 }
 
 // break -> "break";
-func (p *parser) breakStatement() (statement.Statement, *ParseError) {
+func (p *Parser) breakStatement() (statement.Statement, *ParseError) {
 	if p.inLoop {
 		b := p.prev()
 		_, err := p.consume(tokens.TokenSemi, "Expected ';' after break statement")
@@ -254,7 +338,7 @@ func (p *parser) breakStatement() (statement.Statement, *ParseError) {
 }
 
 // while -> "while" "(" expression ")" statement;
-func (p *parser) whileStatement() (statement.Statement, *ParseError) {
+func (p *Parser) whileStatement() (statement.Statement, *ParseError) {
 	p.inLoop = true
 	p.consume(tokens.TokenOparen, "Expected '(' after 'while'")
 	condition, err := p.expression()
@@ -277,7 +361,7 @@ func (p *parser) whileStatement() (statement.Statement, *ParseError) {
 }
 
 // if -> "if" "(" expression ")" statement ("else" statement)?;
-func (p *parser) ifStatement() (statement.Statement, *ParseError) {
+func (p *Parser) ifStatement() (statement.Statement, *ParseError) {
 	p.consume(tokens.TokenOparen, "Expected '(' after 'if'")
 	condition, err := p.expression()
 
@@ -305,8 +389,8 @@ func (p *parser) ifStatement() (statement.Statement, *ParseError) {
 	return statement.NewIfStatement(condition, thenBranch, elseBranch), nil
 }
 
-// statement.StatementStatement -> statement.Statementession ";";
-func (p *parser) expressionStatement() (statement.Statement, *ParseError) {
+// statement.StatementStatement -> statement.Statement ";";
+func (p *Parser) expressionStatement() (statement.Statement, *ParseError) {
 	value, err := p.expression()
 	if err != nil {
 		return nil, err
@@ -322,8 +406,8 @@ func (p *parser) expressionStatement() (statement.Statement, *ParseError) {
 	return expressionStatement, nil
 }
 
-// printStatement -> "print" statement.Statementession ";";
-func (p *parser) printStatement() (statement.Statement, *ParseError) {
+// printStatement -> "print" statement.Statement ";";
+func (p *Parser) printStatement() (statement.Statement, *ParseError) {
 	value, err := p.expression()
 	if err != nil {
 		return nil, err
@@ -340,7 +424,7 @@ func (p *parser) printStatement() (statement.Statement, *ParseError) {
 }
 
 // block -> "{" declaration* "}";
-func (p *parser) block() ([]statement.Statement, *ParseError) {
+func (p *Parser) block() ([]statement.Statement, *ParseError) {
 	statements := make([]statement.Statement, 0)
 
 	for !p.check(tokens.TokenCsquiggle) && !p.end() {
@@ -363,7 +447,7 @@ func (p *parser) block() ([]statement.Statement, *ParseError) {
 }
 
 // assignment -> tokens.TokenIdentifier "=" assignment | equality;
-func (p *parser) assignment() (expression.Expression, *ParseError) {
+func (p *Parser) assignment() (expression.Expression, *ParseError) {
 	expr, err := p.or()
 	if err != nil {
 		return nil, err
@@ -390,12 +474,12 @@ func (p *parser) assignment() (expression.Expression, *ParseError) {
 }
 
 // represents an expression statement
-func (p *parser) expression() (expression.Expression, *ParseError) {
+func (p *Parser) expression() (expression.Expression, *ParseError) {
 	return p.assignment()
 }
 
 // logical or -> logical and ("or" logical and)*
-func (p *parser) or() (expression.Expression, *ParseError) {
+func (p *Parser) or() (expression.Expression, *ParseError) {
 	expr, err := p.and()
 
 	if err != nil {
@@ -416,7 +500,7 @@ func (p *parser) or() (expression.Expression, *ParseError) {
 	return expr, nil
 }
 
-func (p *parser) and() (expression.Expression, *ParseError) {
+func (p *Parser) and() (expression.Expression, *ParseError) {
 	expr, err := p.equality()
 
 	if err != nil {
@@ -438,7 +522,7 @@ func (p *parser) and() (expression.Expression, *ParseError) {
 }
 
 // equality -> comparison ( ( "!=" | "==" ) comparison )*;
-func (p *parser) equality() (expression.Expression, *ParseError) {
+func (p *Parser) equality() (expression.Expression, *ParseError) {
 	expr, err := p.comparison()
 	if err != nil {
 		return nil, err
@@ -457,7 +541,7 @@ func (p *parser) equality() (expression.Expression, *ParseError) {
 }
 
 // comparison -> term ( ( ">" | ">=" | "<" | "<=" ) term )*;
-func (p *parser) comparison() (expression.Expression, *ParseError) {
+func (p *Parser) comparison() (expression.Expression, *ParseError) {
 	expr, err := p.term()
 
 	if err != nil {
@@ -478,7 +562,7 @@ func (p *parser) comparison() (expression.Expression, *ParseError) {
 }
 
 // term -> ( term ( "+" | "-" ) )*;
-func (p *parser) term() (expression.Expression, *ParseError) {
+func (p *Parser) term() (expression.Expression, *ParseError) {
 	expr, err := p.factor()
 	if err != nil {
 		return nil, err
@@ -497,7 +581,7 @@ func (p *parser) term() (expression.Expression, *ParseError) {
 }
 
 // factor -> ( term ( "/" | "*" ) term )*;
-func (p *parser) factor() (expression.Expression, *ParseError) {
+func (p *Parser) factor() (expression.Expression, *ParseError) {
 	expr, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -518,7 +602,7 @@ func (p *parser) factor() (expression.Expression, *ParseError) {
 }
 
 // unary -> ( "!" | "-" ) unary | primary;
-func (p *parser) unary() (expression.Expression, *ParseError) {
+func (p *Parser) unary() (expression.Expression, *ParseError) {
 	if p.match(tokens.TokenBang, tokens.TokenMinus) {
 		operator := p.prev()
 		right, err := p.unary()
@@ -529,11 +613,35 @@ func (p *parser) unary() (expression.Expression, *ParseError) {
 		return expression.NewUnaryExpression(operator, right), nil
 	}
 
-	return p.primary()
+	return p.call()
+}
+
+// call -> primary ( "(" arguments? ")" )*;
+func (p *Parser) call() (expression.Expression, *ParseError) {
+	expr, err := p.primary()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if p.match(tokens.TokenOparen) {
+			expr, err = p.finishCall(expr)
+
+			if err != nil {
+				return nil, err
+			}
+
+		} else {
+			break
+		}
+	}
+
+	return expr, nil
 }
 
 // primary -> tokens.TokenNumber | tokens.TokenString | "true" | "false" | "nil" | "(" expression ")";
-func (p *parser) primary() (expression.Expression, *ParseError) {
+func (p *Parser) primary() (expression.Expression, *ParseError) {
 	if p.match(tokens.TokenFalse) {
 		return expression.NewLiteralExpression(false), nil
 	}
@@ -556,7 +664,7 @@ func (p *parser) primary() (expression.Expression, *ParseError) {
 			return nil, err
 		}
 
-		_, err = p.consume(tokens.TokenCparen, "expected ')' after expression.")
+		_, err = p.consume(tokens.TokenCparen, "Expected ')' after expression.")
 		if err != nil {
 			return nil, err
 		}
@@ -568,10 +676,39 @@ func (p *parser) primary() (expression.Expression, *ParseError) {
 		return expression.NewVariableExpression(p.prev()), nil
 	}
 
-	return nil, newParseError(p.peek(), "expected expression")
+	return nil, newParseError(p.peek(), "Expected expression.")
 }
 
-func (p *parser) consume(t tokens.TokenType, errorMsg string) (tokens.Token, *ParseError) {
+func (p *Parser) finishCall(callee expression.Expression) (expression.Expression, *ParseError) {
+	arguments := make([]expression.Expression, 0)
+
+	if !p.check(tokens.TokenCparen) {
+		for remainingArgs := true; remainingArgs; remainingArgs = p.match(tokens.TokenComma) {
+			// Cap arg length to 255.
+			if len(arguments) >= 255 {
+				return nil, newParseError(p.peek(), "A function cannot have more than 255 arguments.")
+			}
+
+			expr, err := p.expression()
+
+			if err != nil {
+				return nil, err
+			}
+
+			arguments = append(arguments, expr)
+		}
+	}
+
+	paren, err := p.consume(tokens.TokenCparen, "Expected ')' after function arguments.")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return expression.NewCallExpression(callee, paren, arguments), nil
+}
+
+func (p *Parser) consume(t tokens.TokenType, errorMsg string) (tokens.Token, *ParseError) {
 	if p.check(t) {
 		return p.next(), nil
 	}
@@ -580,7 +717,7 @@ func (p *parser) consume(t tokens.TokenType, errorMsg string) (tokens.Token, *Pa
 }
 
 // Synchronize when we've caught an error to the next valid tokens.Token
-func (p *parser) synchronize() {
+func (p *Parser) synchronize() {
 	p.next()
 
 	for !p.end() {

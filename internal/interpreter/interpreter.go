@@ -10,19 +10,36 @@ import (
 	"github.com/jparr721/obsidian/internal/tokens"
 )
 
-//TODO(@jparr721) - This _really_ needs to use Visitors with error propagation.
+func stringify(evaluated interface{}) string {
+	if evaluated == nil {
+		return "nil"
+	}
 
-type interpreter struct {
+	if reflect.TypeOf(evaluated).String() == "float64" {
+		return strconv.FormatFloat(evaluated.(float64), 'f', -1, 64)
+	}
+
+	return fmt.Sprintf("%v", evaluated)
+}
+
+type Interpreter struct {
+	// globals are the global native objects, constants, and functions
+	globals      *environment
 	environment  *environment
 	loopDidBreak bool
 }
 
-func NewInterpreter() *interpreter {
-	return &interpreter{NewEnvironment(nil), false}
+func NewInterpreter() *Interpreter {
+	environment := NewEnvironment(nil)
+	globals := NewEnvironment(nil)
+	globals.define("clock", new(clockFunction))
+
+	return &Interpreter{globals, environment, false}
 }
 
-func (i *interpreter) Interpret(statements []statement.Statement) error {
+func (i *Interpreter) Interpret(statements []statement.Statement) error {
 	for _, statement := range statements {
+    fmt.Println(i.environment)
 		_, err := i.execute(statement)
 
 		if err != nil {
@@ -34,7 +51,7 @@ func (i *interpreter) Interpret(statements []statement.Statement) error {
 	return nil
 }
 
-func (i *interpreter) executeBlock(statements []statement.Statement, environment *environment) error {
+func (i *Interpreter) executeBlock(statements []statement.Statement, environment *environment) error {
 	previous := i.environment
 
 	// Lift into new environment context
@@ -42,6 +59,7 @@ func (i *interpreter) executeBlock(statements []statement.Statement, environment
 
 	// Run everything in this scope
 	for _, statement := range statements {
+    fmt.Println(reflect.TypeOf(statement))
 		if reflect.TypeOf(statement).String() == "*statement.BreakStatement" {
 			i.loopDidBreak = true
 			break
@@ -58,31 +76,25 @@ func (i *interpreter) executeBlock(statements []statement.Statement, environment
 	return nil
 }
 
-func (i *interpreter) execute(s statement.Statement) (interface{}, error) {
+func (i *Interpreter) execute(s statement.Statement) (interface{}, error) {
 	return s.Accept(i)
 }
 
-func (i *interpreter) stringify(evaluated interface{}) string {
-	if evaluated == nil {
-		return "nil"
-	}
-
-	if reflect.TypeOf(evaluated).String() == "float64" {
-		return strconv.FormatFloat(evaluated.(float64), 'f', -1, 64)
-	}
-
-	return fmt.Sprintf("%v", evaluated)
-}
-
-func (i *interpreter) evaluate(e expression.Expression) (interface{}, error) {
+func (i *Interpreter) evaluate(e expression.Expression) (interface{}, error) {
 	return e.Accept(i)
 }
 
-func (i *interpreter) VisitBreakStatement(s *statement.BreakStatement) (interface{}, error) {
+func (i *Interpreter) VisitFunctionStatement(s *statement.FunctionStatement) (interface{}, error) {
+	function := NewFunction(s)
+	i.environment.define(s.Name.Lexeme, function)
 	return nil, nil
 }
 
-func (i *interpreter) VisitWhileStatement(s *statement.WhileStatement) (interface{}, error) {
+func (i *Interpreter) VisitBreakStatement(s *statement.BreakStatement) (interface{}, error) {
+	return nil, nil
+}
+
+func (i *Interpreter) VisitWhileStatement(s *statement.WhileStatement) (interface{}, error) {
 	for {
 		if i.loopDidBreak {
 			i.loopDidBreak = false
@@ -109,7 +121,7 @@ func (i *interpreter) VisitWhileStatement(s *statement.WhileStatement) (interfac
 	return nil, nil
 }
 
-func (i *interpreter) VisitIfStatement(s *statement.IfStatement) (interface{}, error) {
+func (i *Interpreter) VisitIfStatement(s *statement.IfStatement) (interface{}, error) {
 	cond, err := i.evaluate(s.Condition)
 
 	if err != nil {
@@ -125,11 +137,11 @@ func (i *interpreter) VisitIfStatement(s *statement.IfStatement) (interface{}, e
 	return nil, nil
 }
 
-func (i *interpreter) VisitBlockStatement(s *statement.BlockStatement) (interface{}, error) {
+func (i *Interpreter) VisitBlockStatement(s *statement.BlockStatement) (interface{}, error) {
 	return nil, i.executeBlock(s.Statements, NewEnvironment(i.environment))
 }
 
-func (i *interpreter) VisitVariableStatement(s *statement.VariableStatement) (interface{}, error) {
+func (i *Interpreter) VisitVariableStatement(s *statement.VariableStatement) (interface{}, error) {
 	var value interface{} = nil
 	var err error
 
@@ -147,7 +159,7 @@ func (i *interpreter) VisitVariableStatement(s *statement.VariableStatement) (in
 	return nil, nil
 }
 
-func (i *interpreter) VisitExpressionStatement(s *statement.ExpressionStatement) (interface{}, error) {
+func (i *Interpreter) VisitExpressionStatement(s *statement.ExpressionStatement) (interface{}, error) {
 	_, err := i.evaluate(s.Expression)
 
 	if err != nil {
@@ -157,26 +169,71 @@ func (i *interpreter) VisitExpressionStatement(s *statement.ExpressionStatement)
 	return nil, nil
 }
 
-func (i *interpreter) VisitPrintStatement(s *statement.PrintStatement) (interface{}, error) {
+func (i *Interpreter) VisitPrintStatement(s *statement.PrintStatement) (interface{}, error) {
 	value, err := i.evaluate(s.Expression)
 
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println(i.stringify(value))
+	fmt.Println(stringify(value))
 
 	return nil, nil
 }
 
-func (i *interpreter) VisitLogicalExpression(a *expression.LogicalExpression) (interface{}, error) {
-	left, err := i.evaluate(a.Left)
+func (i *Interpreter) VisitReturnStatement(s *statement.ReturnStatement) (interface{}, error) {
+	if s.Value != nil {
+		value, err := i.evaluate(s.Value)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, newReturnInterrupt(value)
+	}
+
+	return nil, newReturnInterrupt(nil)
+}
+
+func (i *Interpreter) VisitCallExpression(e *expression.CallExpression) (interface{}, error) {
+	callee, err := i.evaluate(e.Callee)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if a.Operator.Variant == tokens.TokenOr {
+	arguments := make([]interface{}, 0)
+	for _, argument := range e.Arguments {
+		a, err := i.evaluate(argument)
+
+		if err != nil {
+			return nil, err
+		}
+
+		arguments = append(arguments, a)
+	}
+
+	if reflect.TypeOf(callee).String() != "*interpreter.Function" {
+		return nil, newRuntimeError(e.Paren, "Only function and class types are callable.")
+	}
+
+	function := callee.(Callable)
+
+	if function.Arity() != len(arguments) {
+		return nil, newRuntimeError(e.Paren, fmt.Sprintf("Expected %d arguments, but got %d.", function.Arity(), len(arguments)))
+	}
+
+	return function.Call(i, arguments)
+}
+
+func (i *Interpreter) VisitLogicalExpression(e *expression.LogicalExpression) (interface{}, error) {
+	left, err := i.evaluate(e.Left)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if e.Operator.Variant == tokens.TokenOr {
 		if i.isTruthy(left) {
 			return left, nil
 		}
@@ -186,17 +243,17 @@ func (i *interpreter) VisitLogicalExpression(a *expression.LogicalExpression) (i
 		}
 	}
 
-	return i.evaluate(a.Right)
+	return i.evaluate(e.Right)
 }
 
-func (i *interpreter) VisitAssignExpression(a *expression.AssignExpression) (interface{}, error) {
-	value, err := i.evaluate(a.Value)
+func (i *Interpreter) VisitAssignExpression(e *expression.AssignExpression) (interface{}, error) {
+	value, err := i.evaluate(e.Value)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = i.environment.assign(a.Name, value)
+	err = i.environment.assign(e.Name, value)
 
 	if err != nil {
 		return nil, err
@@ -205,7 +262,7 @@ func (i *interpreter) VisitAssignExpression(a *expression.AssignExpression) (int
 	return nil, nil
 }
 
-func (i *interpreter) VisitVariableExpression(e *expression.VariableExpression) (interface{}, error) {
+func (i *Interpreter) VisitVariableExpression(e *expression.VariableExpression) (interface{}, error) {
 	value, err := i.environment.get(e.Name)
 
 	if err != nil {
@@ -215,15 +272,15 @@ func (i *interpreter) VisitVariableExpression(e *expression.VariableExpression) 
 	return value, nil
 }
 
-func (i *interpreter) VisitLiteralExpression(e *expression.LiteralExpression) (interface{}, error) {
+func (i *Interpreter) VisitLiteralExpression(e *expression.LiteralExpression) (interface{}, error) {
 	return e.Value, nil
 }
 
-func (i *interpreter) VisitGroupingExpression(e *expression.GroupingExpression) (interface{}, error) {
+func (i *Interpreter) VisitGroupingExpression(e *expression.GroupingExpression) (interface{}, error) {
 	return i.evaluate(e)
 }
 
-func (i *interpreter) VisitBinaryExpression(e *expression.BinaryExpression) (interface{}, error) {
+func (i *Interpreter) VisitBinaryExpression(e *expression.BinaryExpression) (interface{}, error) {
 	left, err := i.evaluate(e.Left)
 
 	if err != nil {
@@ -291,7 +348,7 @@ func (i *interpreter) VisitBinaryExpression(e *expression.BinaryExpression) (int
 	return nil, nil
 }
 
-func (i *interpreter) VisitUnaryExpression(e *expression.UnaryExpression) (interface{}, error) {
+func (i *Interpreter) VisitUnaryExpression(e *expression.UnaryExpression) (interface{}, error) {
 	right, err := i.evaluate(e.Right.(expression.Expression))
 
 	if err != nil {
@@ -315,11 +372,11 @@ func (i *interpreter) VisitUnaryExpression(e *expression.UnaryExpression) (inter
 	return nil, nil
 }
 
-func (i *interpreter) isEqual(a, b interface{}) bool {
+func (i *Interpreter) isEqual(a, b interface{}) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func (i *interpreter) checkBinaryNumberOperands(operator tokens.Token, left, right interface{}) *RuntimeError {
+func (i *Interpreter) checkBinaryNumberOperands(operator tokens.Token, left, right interface{}) *RuntimeError {
 	if reflect.TypeOf(left).String() == "float64" && reflect.TypeOf(right).String() == "float64" {
 		return nil
 	}
@@ -327,7 +384,7 @@ func (i *interpreter) checkBinaryNumberOperands(operator tokens.Token, left, rig
 	return newRuntimeError(operator, "Operands must be two numbers.")
 }
 
-func (i *interpreter) checkInfixNumberOperand(operator tokens.Token, operand interface{}) *RuntimeError {
+func (i *Interpreter) checkInfixNumberOperand(operator tokens.Token, operand interface{}) *RuntimeError {
 	if reflect.TypeOf(operand).String() == "float64" {
 		return nil
 	}
@@ -336,7 +393,7 @@ func (i *interpreter) checkInfixNumberOperand(operator tokens.Token, operand int
 }
 
 // only nil and false are falsy values, everything else evaluates to truthy
-func (i *interpreter) isTruthy(value interface{}) bool {
+func (i *Interpreter) isTruthy(value interface{}) bool {
 	if value == nil {
 		return false
 	}

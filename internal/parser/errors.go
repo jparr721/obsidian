@@ -6,6 +6,7 @@ import (
 	"github.com/jparr721/obsidian/internal/tokens"
 )
 
+// ParseError represents an error during the parsing process
 type ParseError struct {
 	token   tokens.Token
 	message string
